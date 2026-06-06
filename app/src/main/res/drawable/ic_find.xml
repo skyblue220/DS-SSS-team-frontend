@@ -1,0 +1,24 @@
+<!--
+  ~ Copyright (C) 2026 The Android Open Source Project
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~      http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="90dp"
+    android:height="90dp"
+    android:viewportWidth="90"
+    android:viewportHeight="90">
+  <path
+      android:pathData="M7.313,55.821L0,50.786L22.5,16.5L36,31.5L54,3.643L67.5,22.929L82.688,0L90,5.036L67.725,38.679L54.338,19.5L37.237,45.964L23.625,30.857L7.313,55.821ZM60.75,72.857C63.9,72.857 66.563,71.821 68.738,69.75C70.912,67.679 72,65.143 72,62.143C72,59.143 70.912,56.607 68.738,54.536C66.563,52.464 63.9,51.429 60.75,51.429C57.6,51.429 54.938,52.464 52.763,54.536C50.588,56.607 49.5,59.143 49.5,62.143C49.5,65.143 50.588,67.679 52.763,69.75C54.938,71.821 57.6,72.857 60.75,72.857ZM83.7,90L71.55,78.429C69.975,79.429 68.269,80.179 66.431,80.679C64.594,81.179 62.7,81.429 60.75,81.429C55.125,81.429 50.344,79.554 46.406,75.804C42.469,72.054 40.5,67.5 40.5,62.143C40.5,56.786 42.469,52.232 46.406,48.482C50.344,44.732 55.125,42.857 60.75,42.857C66.375,42.857 71.156,44.732 75.094,48.482C79.031,52.232 81,56.786 81,62.143C81,64 80.738,65.804 80.213,67.554C79.688,69.304 78.9,70.929 77.85,72.429L90,84L83.7,90Z"
+      android:fillColor="#444B53"/>
+</vector>
