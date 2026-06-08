@@ -5,20 +5,25 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sss.healthcare.ui.theme.HealthCareTheme
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,279 +39,377 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun HealthCareAppScreen() {
-    // 0: 홈, 1: 달력, 2: 통계, 3: 프로필
     var selectedTab by remember { mutableIntStateOf(0) }
+    val mainBrandColor = Color(0xFF00A896) // 피그마 메인 민트색
 
     Scaffold(
         bottomBar = {
-            NavigationBar(
-                containerColor = Color.White,
+            // 피그마와 동일한 형태의 커스텀 하단바 구성
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(85.dp),
+                color = Color.White,
                 tonalElevation = 8.dp
             ) {
-                // 1. 홈 탭
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_home), // 💡 ic_home으로 변경 완료!
-                            contentDescription = "홈",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    label = { Text("홈") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF1E73E8),
-                        selectedTextColor = Color(0xFF1E73E8),
-                        unselectedIconColor = Color.LightGray,
-                        unselectedTextColor = Color.LightGray
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val tabs = listOf(
+                        Triple("홈", R.drawable.home_icon, 0),
+                        Triple("기록", R.drawable.record_icon, 1),
+                        Triple("통계", R.drawable.summary_icon, 2),
+                        Triple("정보", R.drawable.disease_icon, 3)
                     )
-                )
 
-                // 2. 캘린더 탭
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_calander),
-                            contentDescription = "달력",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    label = { Text("달력") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF1E73E8),
-                        selectedTextColor = Color(0xFF1E73E8),
-                        unselectedIconColor = Color.LightGray,
-                        unselectedTextColor = Color.LightGray
-                    )
-                )
+                    tabs.forEach { (label, icon, index) ->
+                        val isSelected = selectedTab == index
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clickable { selectedTab = index },
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // 💡 피그마 스타일: 선택되었을 때만 상단에 나타나는 민트색 라인 인디케이터
+                            Box(
+                                modifier = Modifier
+                                    .width(36.dp)
+                                    .height(4.dp)
+                                    .background(
+                                        if (isSelected) mainBrandColor else Color.Transparent,
+                                        shape = RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp)
+                                    )
+                            )
 
-                // 3. 통계 탭
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_find),
-                            contentDescription = "통계",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    label = { Text("통계") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF1E73E8),
-                        selectedTextColor = Color(0xFF1E73E8),
-                        unselectedIconColor = Color.LightGray,
-                        unselectedTextColor = Color.LightGray
-                    )
-                )
+                            Spacer(modifier = Modifier.weight(1f))
 
-                // 4. 프로필 탭
-                NavigationBarItem(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_user),
-                            contentDescription = "프로필",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    label = { Text("프로필") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF1E73E8),
-                        selectedTextColor = Color(0xFF1E73E8),
-                        unselectedIconColor = Color.LightGray,
-                        unselectedTextColor = Color.LightGray
-                    )
-                )
+                            Icon(
+                                painter = painterResource(id = icon),
+                                contentDescription = label,
+                                tint = if (isSelected) mainBrandColor else Color(0xFF9E9E9E),
+                                modifier = Modifier.size(26.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) mainBrandColor else Color(0xFF9E9E9E)
+                            )
+
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
             }
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedTab) {
-                0 -> MainLayout()
-                1 -> DummyScreen(title = "달력 화면 준비 중")
-                2 -> DummyScreen(title = "통계 화면 준비 중")
-                3 -> DummyScreen(title = "프로필 화면 준비 중")
+                0 -> MainLayout(mainBrandColor)
+                else -> DummyScreen("준비 중인 화면입니다")
             }
         }
     }
 }
 
-
-
-data class HealthData(
-    val walkCount: Int,
-    val sleepHours: Int,
-    val sleepMinutes: Int,
-    val burnedCalories: Int
-)
-
 @Composable
-fun MainLayout() {
+fun MainLayout(brandColor: Color) {
     val scrollState = rememberScrollState()
 
-    // 2. [예약석] 삼성 헬스 등에서 받아온 데이터가 저장될 '상태(State)' 변수
-    // 지금은 임시로 값을 넣어두었지만, 나중에 API 연동 시 이 값만 바꾸면 UI가 자동 갱신됩니다.
-    var todayHealthData by remember {
-        mutableStateOf(
-            HealthData(
-                walkCount = 6432,       // 💡 나중에 삼성 헬스 실시간 걸음 수 연결
-                sleepHours = 7,         // 💡 나중에 삼성 헬스 수면 시간 연결
-                sleepMinutes = 12,
-                burnedCalories = 345    // 💡 나중에 소모 칼로리 연결
-            )
-        )
-    }
+    // 피그마와 일치하는 우상단 그라데이션 컬러 매핑
+    val gradientBrush = Brush.linearGradient(
+        colors = listOf(Color(0xFF00C2A0), Color(0xFF1E73E8))
+    )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F7FA))
+            .background(Color(0xFFEFF7F6)) // 피그마 특유의 은은한 민트빛 회색 배경
             .verticalScroll(scrollState)
-            .padding(20.dp)
+            .padding(horizontal = 24.dp)
     ) {
-        // 타이틀 및 점수 카드는 기존과 동일 (생략 가능)
+        Spacer(modifier = Modifier.height(50.dp))
+
+        // 1. 헤더 섹션
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(text = "안녕하세요!", fontSize = 16.sp, color = Color.Gray)
-                Text(text = "오늘의 건강을 기록해요", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(text = "안녕하세요!", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF263238))
+                Text(text = "오늘의 건강을 기록해요", fontSize = 13.sp, color = Color(0xFF78909C))
             }
-            Text(text = "👤", fontSize = 28.sp)
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 주간 점수 카드
-        Card(
-            modifier = Modifier.fillMaxWidth().height(180.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E73E8))
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(24.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = Color.White,
+                tonalElevation = 1.dp
             ) {
-                Text(text = "주간 종합 상태 점수", color = Color.White.copy(alpha = 0.8f), fontSize = 16.sp)
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(text = "83", color = Color.White, fontSize = 56.sp, fontWeight = FontWeight.Bold)
-                    Text(text = " 점", color = Color.White, fontSize = 20.sp, modifier = Modifier.padding(bottom = 12.dp))
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.disease_icon),
+                        contentDescription = "프로필",
+                        tint = brandColor,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
-                Text(text = "일주일간 입력된 기록을 바탕으로 계산된 점수입니다.", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
             }
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        Text(
-            text = "오늘의 활동 기록",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A),
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // 3. 하드코딩된 글자 대신 'todayHealthData' 변수 값을 꽂아넣음
-        Row(
+        // 2. 주간 종합 점수 카드 (그라데이션 및 방패 백그라운드 반영)
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            shape = RoundedCornerShape(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
-            ActivityCard(
-                modifier = Modifier.weight(1f),
-                title = "걸음 수",
-                value = String.format("%,d 걸음", todayHealthData.walkCount), // 숫자에 콤마(,) 포맷팅
-                target = "목표 10,000 걸음",
-                iconResId = R.drawable.ic_walk,
-                iconColor = Color(0xFF4CAF50)
-            )
-            ActivityCard(
-                modifier = Modifier.weight(1f),
-                title = "수면 시간",
-                value = "${todayHealthData.sleepHours}시간 ${todayHealthData.sleepMinutes}분",
-                target = "적정 수면 달성",
-                iconResId = R.drawable.ic_moon,
-                iconColor = Color(0xFF673AB7)
-            )
+            Box(
+                modifier = Modifier
+                    .background(gradientBrush)
+                    .padding(24.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("주간 종합 상태 점수", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            // 외부 에러 유발 아이콘 대신 내부 리소스 안전하게 재사용
+                            Icon(
+                                painter = painterResource(id = R.drawable.summary_icon),
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text("83", color = Color.White, fontSize = 56.sp, fontWeight = FontWeight.Bold)
+                            Text(" 점", color = Color.White, fontSize = 20.sp, modifier = Modifier.padding(bottom = 10.dp), fontWeight = FontWeight.Medium)
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            "일주일간 입력된 기록을 바탕으로\n계산된 종합 상태 점수입니다",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+
+                    // 우측 방패 심볼 레이아웃 매칭
+                    Icon(
+                        painter = painterResource(id = R.drawable.disease_icon),
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.15f),
+                        modifier = Modifier
+                            .size(90.dp)
+                            .align(Alignment.CenterVertically)
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 3. 수면 / 운동 수평 대칭 카드 (기존 Int 대신 Color 객체로 바로 전달)
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            ActivityCard(
-                modifier = Modifier.weight(1f),
-                title = "소모 칼로리",
-                value = "${todayHealthData.burnedCalories} kcal",
-                target = "목표 500 kcal",
-                iconResId = R.drawable.ic_find,
-                iconColor = Color(0xFFFF5722)
-            )
-            Box(modifier = Modifier.weight(1f))
+            // 💡 Color(0xFF...) 형태로 직접 변경
+            ActivityHorizontalCard(Modifier.weight(1f), "수면", "7 시간", R.drawable.moon_icon, Color(0xFF1E3A8A))
+            ActivityHorizontalCard(Modifier.weight(1f), "운동", "30 분", R.drawable.walk_icon, Color(0xFF00A896))
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 4. 오늘의 식사 섹션
+        TodayMealSection()
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 5. 오늘의 기록 섹션
+        TodayRecordSection(brandColor)
+
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
-// 5. 재사용 가능한 활동 기록 카드 컴포저블
+
 @Composable
-fun ActivityCard(
-    modifier: Modifier = Modifier,
-    title: String,
-    value: String,
-    target: String,
-    iconResId: Int,
-    iconColor: Color
-) {
+fun ActivityHorizontalCard(modifier: Modifier, title: String, value: String, iconId: Int, themeColor: Color) { // 💡 Int -> Color로 변경
     Card(
-        modifier = modifier.height(140.dp),
+        modifier = modifier,
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Surface(
+                shape = CircleShape,
+                color = themeColor.copy(alpha = 0.08f), // 💡 Color(themeColor) 지우고 바로 복사본 사용
+                modifier = Modifier.size(38.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        painter = painterResource(id = iconId),
+                        contentDescription = null,
+                        tint = themeColor, // 💡 바로 themeColor 적용
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(title, fontSize = 11.sp, color = Color(0xFF78909C), fontWeight = FontWeight.Medium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = value.split(" ")[0],
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF263238)
+                    )
+                    Text(
+                        text = " " + value.split(" ")[1],
+                        fontSize = 13.sp,
+                        color = Color(0xFF00A896),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TodayMealSection() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = title, fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = Color(0xFFE0F2F1),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("🍴", fontSize = 14.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("오늘의 식사", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF263238))
+                }
                 Icon(
-                    painter = painterResource(id = iconResId),
-                    contentDescription = title,
-                    tint = iconColor,
-                    modifier = Modifier.size(24.dp)
+                    painter = painterResource(id = R.drawable.summary_icon),
+                    contentDescription = null,
+                    tint = Color(0xFFCFD8DC),
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
-            Column {
-                Text(text = value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E1E1E))
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = target, fontSize = 12.sp, color = Color.LightGray)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            MealItemRow("아침", "바나나, 우유", Color(0xFFFFE0B2), Color(0xFFE65100))
+            Spacer(modifier = Modifier.height(10.dp))
+            MealItemRow("점심", "김치볶음밥", Color(0xFFC8E6C9), Color(0xFF1B5E20))
+            Spacer(modifier = Modifier.height(10.dp))
+            MealItemRow("저녁", "아직 입력하지 않음", Color(0xFFF3E5F5), Color(0xFF4A148C))
+        }
+    }
+}
+
+@Composable
+fun MealItemRow(tag: String, content: String, bgColor: Color, textColor: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(46.dp)
+                .height(22.dp)
+                .background(bgColor, shape = RoundedCornerShape(6.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(tag, color = textColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Text(
+            text = content,
+            fontSize = 13.sp,
+            color = if (content.contains("아직")) Color(0xFFB0BEC5) else Color(0xFF37474F),
+            fontWeight = if (content.contains("아직")) FontWeight.Normal else FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+fun TodayRecordSection(brandColor: Color) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = brandColor.copy(alpha = 0.08f),
+                modifier = Modifier.size(38.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("❤️", fontSize = 16.sp)
+                }
             }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text("오늘의 기록", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF263238))
+                Text("오늘의 컨디션을 기록해요", fontSize = 12.sp, color = Color(0xFF78909C))
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                painter = painterResource(id = R.drawable.summary_icon),
+                contentDescription = null,
+                tint = Color(0xFFCFD8DC),
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
 
 @Composable
 fun DummyScreen(title: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = title, fontSize = 20.sp, color = Color.Gray)
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(title, color = Color.Gray, fontSize = 16.sp)
     }
 }
