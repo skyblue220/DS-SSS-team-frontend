@@ -125,34 +125,27 @@ fun HealthCareAppScreen() {
                 }
             }
         }
-    ) { innerPadding ->
+    )
+    { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             AnimatedContent(
                 targetState = selectedTab,
                 transitionSpec = {
+                    // 팀원이 작성한 슬라이드 애니메이션 로직 (그대로 유지)
                     if (targetState > initialState) {
-                        slideInHorizontally(
-                            animationSpec = tween(320, easing = FastOutSlowInEasing),
-                            initialOffsetX = { fullWidth -> fullWidth / 3 }
-                        ) + fadeIn(animationSpec = tween(220)) togetherWith slideOutHorizontally(
-                            animationSpec = tween(320, easing = FastOutSlowInEasing),
-                            targetOffsetX = { fullWidth -> -fullWidth / 3 }
-                        ) + fadeOut(animationSpec = tween(220))
+                        slideInHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), initialOffsetX = { fullWidth -> fullWidth / 3 }) + fadeIn(animationSpec = tween(220)) togetherWith
+                                slideOutHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), targetOffsetX = { fullWidth -> -fullWidth / 3 }) + fadeOut(animationSpec = tween(220))
                     } else {
-                        slideInHorizontally(
-                            animationSpec = tween(320, easing = FastOutSlowInEasing),
-                            initialOffsetX = { fullWidth -> -fullWidth / 3 }
-                        ) + fadeIn(animationSpec = tween(220)) togetherWith slideOutHorizontally(
-                            animationSpec = tween(320, easing = FastOutSlowInEasing),
-                            targetOffsetX = { fullWidth -> fullWidth / 3 }
-                        ) + fadeOut(animationSpec = tween(220))
+                        slideInHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), initialOffsetX = { fullWidth -> -fullWidth / 3 }) + fadeIn(animationSpec = tween(220)) togetherWith
+                                slideOutHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), targetOffsetX = { fullWidth -> fullWidth / 3 }) + fadeOut(animationSpec = tween(220))
                     }
                 },
                 label = "screenTransition"
             ) { tab ->
+                // 💡 이 분기문을 수정하여 화면을 연결합니다!
                 when (tab) {
                     0 -> MainLayout()
-                    1 -> DummyScreen(title = "기록 화면 준비 중")
+                    1 -> CalendarLayout() // 👈 DummyScreen 대신 방금 만든 달력 화면 파일 연결!
                     2 -> DummyScreen(title = "통계 화면 준비 중")
                     3 -> DummyScreen(title = "정보 화면 준비 중")
                 }
