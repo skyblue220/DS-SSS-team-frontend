@@ -29,13 +29,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sss.healthcare.ui.theme.HealthCareTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -209,7 +209,12 @@ fun MainLayout() {
             .fillMaxSize()
             .background(Color(0xFFF2FFFF))
             .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 18.dp)
+            .padding(
+                start = 20.dp,
+                end = 20.dp,
+                top = 18.dp,
+                bottom = 80.dp // 하단 탭바 높이만큼 여유 공간 확보!
+            )
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
