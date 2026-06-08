@@ -29,6 +29,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -215,9 +216,8 @@ fun MainLayout() {
             .fillMaxSize()
             .background(Color(0xFFF2FFFF))
             .verticalScroll(scrollState)
-            .padding(20.dp)
+            .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {
-        // 타이틀 및 점수 카드는 기존과 동일 (생략 가능)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -250,18 +250,17 @@ fun MainLayout() {
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        // 주간 점수 카드
         Card(
-            modifier = Modifier.fillMaxWidth().aspectRatio(1.62f),
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth().aspectRatio(1.64f),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(28.dp))
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_main_score_background),
@@ -270,20 +269,427 @@ fun MainLayout() {
                     contentScale = ContentScale.Crop
                 )
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 28.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 26.dp, vertical = 26.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(text = "주간 종합 상태 점수", color = Color.White.copy(alpha = 0.8f), fontSize = 16.sp)
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(text = "83", color = Color.White, fontSize = 56.sp, fontWeight = FontWeight.Bold)
-                        Text(text = " 점", color = Color.White, fontSize = 20.sp, modifier = Modifier.padding(bottom = 12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "주간 종합 상태 점수",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Text(text = "일주일간 입력된 기록을 바탕으로 계산된 점수입니다.", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(text = "83", color = Color.White, fontSize = 74.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(text = " 점", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp, bottom = 12.dp))
+                    }
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        Text(text = "일주일간 입력된 기록을 바탕으로", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(text = "계산된 종합 상태 점수입니다", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            SleepSummaryCard(modifier = Modifier.weight(1f))
+            ExerciseSummaryCard(modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        MealCard(
+            meals = listOf(
+                MealRowData("아침", "바나나, 우유", Color(0xFFFFF5E8), Color(0xFFFF6B00)),
+                MealRowData("점심", "김치볶음밥", Color(0xFFEAF9F0), Color(0xFF148847)),
+                MealRowData("저녁", "아직 입력하지 않음", Color(0xFFF4ECFF), Color(0xFF8E2DE2))
+            )
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        RecordCard()
+
+        Spacer(modifier = Modifier.height(20.dp))
+    }
+}
+
+data class MealRowData(
+    val label: String,
+    val content: String,
+    val badgeBackground: Color,
+    val badgeTextColor: Color
+)
+
+@Composable
+fun SleepSummaryCard(
+    modifier: Modifier = Modifier
+) {
+    Card(
+        // 카드 전체 세로 크기
+        modifier = modifier.height(110.dp),
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                // 카드 내부 전체 여백
+                .padding(horizontal = 6.dp, vertical = 12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    // 아이콘이 차지하는 영역 크기
+                    .size(64.dp)
+                    .align(Alignment.CenterStart)
+                    // 아이콘 영역 좌우 위치
+                    .offset(x = 0.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_moon),
+                    contentDescription = "수면",
+                    // 실제 아이콘 표시 크기
+                    modifier = Modifier.size(55.dp),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    // 구분선 길이
+                    .height(64.dp)
+                    .align(Alignment.CenterStart)
+                    // 구분선 좌우 위치
+                    .offset(x = 66.dp)
+                    .background(Color(0xFFE7EDF3))
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    // 오른쪽 텍스트 영역 시작 위치와 폭
+                    .padding(start = 78.dp, end = 18.dp, top = 2.dp),
+                verticalArrangement = Arrangement.Top
+            ) {
+                Text(
+                    text = "수면",
+                    color = Color(0xFF111111),
+                    // 제목 글자 크기
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "7",
+                        color = Color(0xFF1776C9),
+                        // 큰 숫자 크기
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        lineHeight = 34.sp
+                    )
+                    Text(
+                        text = "시간",
+                        color = Color(0xFF1776C9),
+                        // 숫자 옆 단위 글자 크기
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        // 단위 위치 미세 조정
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                    )
+                }
+            }
+            Text(
+                text = "›",
+                color = Color(0xFFB9C5CA),
+                // 오른쪽 화살표 크기
+                fontSize = 24.sp,
+                lineHeight = 22.sp,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    // 화살표 위치 미세 조정
+                    .padding(end = 0.dp, top = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun ExerciseSummaryCard(
+    modifier: Modifier = Modifier
+) {
+    Card(
+        // 카드 전체 세로 크기
+        modifier = modifier.height(110.dp),
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                // 카드 내부 전체 여백
+                .padding(horizontal = 6.dp, vertical = 12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    // 아이콘이 차지하는 영역 크기
+                    .size(64.dp)
+                    .align(Alignment.CenterStart)
+                    // 아이콘 영역 좌우 위치
+                    .offset(x = 0.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_walk),
+                    contentDescription = "운동",
+                    // 실제 아이콘 표시 크기
+                    modifier = Modifier.size(55.dp),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    // 구분선 길이
+                    .height(64.dp)
+                    .align(Alignment.CenterStart)
+                    // 구분선 좌우 위치
+                    .offset(x = 66.dp)
+                    .background(Color(0xFFE7EDF3))
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    // 오른쪽 텍스트 영역 시작 위치와 폭
+                    .padding(start = 78.dp, end = 18.dp, top = 2.dp),
+                verticalArrangement = Arrangement.Top
+            ) {
+                Text(
+                    text = "운동",
+                    color = Color(0xFF111111),
+                    // 제목 글자 크기
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Text(
+                        text = "30",
+                        color = Color(0xFF21B8BE),
+                        // 왼쪽 값 글자 크기
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = "분",
+                        color = Color(0xFF21B8BE),
+                        // 오른쪽 값 글자 크기
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        // 값 텍스트 간격/위치 조정
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                    )
+                }
+            }
+            Text(
+                text = "›",
+                color = Color(0xFFB9C5CA),
+                // 오른쪽 화살표 크기
+                fontSize = 24.sp,
+                lineHeight = 22.sp,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    // 화살표 위치 미세 조정
+                    .padding(end = 0.dp, top = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun MealCard(
+    meals: List<MealRowData>
+) {
+    Card(
+        // 식사 카드 전체 가로 폭
+        // 카드 자체 높이를 직접 줄이고 싶으면 .height(...) 또는 .heightIn(...)를 여기 modifier에 추가
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 240.dp),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(
+            // 식사 카드 내부 전체 여백
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_food),
+                    contentDescription = "식사",
+                    // 왼쪽 식사 아이콘 크기
+                    modifier = Modifier.size(30.dp)
+                )
+                // 아이콘과 제목 사이 간격
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "오늘의 식사",
+                    color = Color(0xFF12223C),
+                    // 카드 제목 글자 크기
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "›",
+                    color = Color(0xFFB9C5CA),
+                    // 오른쪽 화살표 크기
+                    fontSize = 42.sp,
+                    lineHeight = 36.sp
+                )
+            }
+
+            // 제목 영역과 첫 식사 줄 사이 간격
+            Spacer(modifier = Modifier.height(8.dp))
+
+            meals.forEachIndexed { index, meal ->
+                MealRow(meal = meal)
+                if (index != meals.lastIndex) {
+                    // 식사 줄 사이 간격
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // 줄 구분선 두께
+                            .height(1.dp)
+                            .background(Color(0xFFE6EEF4))
+                    )
+                    // 구분선 아래 간격
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MealRow(meal: MealRowData) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                // 아침/점심/저녁 배지 가로 크기
+                .width(60 .dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(meal.badgeBackground)
+                // 배지 내부 여백
+                .padding(vertical = 3.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = meal.label,
+                color = meal.badgeTextColor,
+                // 배지 텍스트 크기
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        // 배지와 식사 내용 사이 간격
+        Spacer(modifier = Modifier.width(14.dp))
+        Text(
+            text = meal.content,
+            color = if (meal.label == "저녁") Color(0xFF7D868C) else Color(0xFF1D2D45),
+            // 식사 내용 글자 크기
+            fontSize = 13.sp,
+            fontWeight = if (meal.label == "저녁") FontWeight.SemiBold else FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+fun RecordCard() {
+    Card(
+        // 오늘의 기록 카드 전체 가로 폭
+        // 카드 자체 높이를 직접 줄이고 싶으면 .height(...) 또는 .heightIn(...)를 여기 modifier에 추가
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                // 카드 내부 전체 여백
+                .padding(horizontal = 14.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_heart),
+                contentDescription = "오늘의 기록",
+                // 왼쪽 하트 아이콘 크기
+                modifier = Modifier.size(55.dp)
+            )
+            // 아이콘과 구분선 사이 간격
+            Spacer(modifier = Modifier.width(12.dp))
+            Box(
+                modifier = Modifier
+                    // 세로 구분선 두께/길이
+                    .width(1.dp)
+                    .height(56.dp)
+                    .background(Color(0xFFE7EDF3))
+            )
+            // 구분선과 텍스트 사이 간격
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "오늘의 기록",
+                    color = Color(0xFF111111),
+                    // 카드 제목 글자 크기
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "오늘의 컨디션을 기록해요",
+                    color = Color(0xFF7B8086),
+                    // 카드 설명 글자 크기
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text(
+                text = "›",
+                color = Color(0xFFB9C5CA),
+                // 오른쪽 화살표 크기
+                fontSize = 42.sp,
+                lineHeight = 36.sp
+            )
+        }
     }
 }
 
