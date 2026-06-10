@@ -8,7 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -35,6 +35,11 @@ import androidx.compose.ui.unit.sp
 import com.sss.healthcare.ui.theme.HealthCareTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalContext
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.Duration
+import kotlinx.coroutines.launch
 
 
 class MainActivity : ComponentActivity() {
@@ -51,8 +56,92 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun HealthCareAppScreen() {
+    val context = LocalContext.current
+    val sleepDataManager = remember { SleepDataManager(context) }
+    val exerciseDataManager = remember { ExerciseDataManager(context) }
+    val scope = rememberCoroutineScope()
+
     // 0: 홈, 1: 기록, 2: 통계, 3: 정보
     var selectedTab by remember { mutableIntStateOf(0) }
+    
+    // 수면 기록 상태
+    var bedtime by remember { mutableStateOf(LocalTime.of(23, 0)) }
+    var wakeupTime by remember { mutableStateOf(LocalTime.of(7, 0)) }
+    var showSleepDialog by remember { mutableStateOf(false) }
+
+    // 운동 기록 상태
+    var showExerciseDialog by remember { mutableStateOf(false) }
+    var exerciseRecord by remember { mutableStateOf(ExerciseRecord()) }
+
+    // 운동 카드 순환 노출을 위한 상태 (홈 화면용)
+    var exerciseDisplayIndex by remember { mutableStateOf(0) }
+    val exerciseDisplayItems = listOf(
+        Triple("걷기", exerciseRecord.steps, "steps"),
+        Triple("달리기", exerciseRecord.runTime, "분"),
+        Triple("달리기", exerciseRecord.runDistance, "km"),
+        Triple("자전거", exerciseRecord.cycleTime, "분"),
+        Triple("자전거", exerciseRecord.cycleDistance, "km")
+    )
+
+    // 2초마다 정보 전환 애니메이션 타이머
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(4000)//홈화면 (운동버튼 정보 변경주기)
+            exerciseDisplayIndex = (exerciseDisplayIndex + 1) % exerciseDisplayItems.size
+        }
+    }
+
+    // 오늘 날짜 데이터 로드
+    LaunchedEffect(Unit) {
+        // 수면 데이터 로드
+        launch {
+            sleepDataManager.getSleepData(LocalDate.now()).collect { record ->
+                if (record != null) {
+                    bedtime = record.bedtime
+                    wakeupTime = record.wakeupTime
+                }
+            }
+        }
+        // 운동 데이터 로드
+        launch {
+            exerciseDataManager.getExerciseData(LocalDate.now()).collect { record ->
+                exerciseRecord = record ?: ExerciseRecord()
+            }
+        }
+    }
+
+    val sleepDuration = Duration.between(bedtime, wakeupTime).let {
+        if (it.isNegative || it.isZero) it.plusDays(1) else it
+    }
+    val sleepHours = sleepDuration.toHours().toString()
+
+    if (showSleepDialog) {
+        SleepTimeDialog(
+            initialBedtime = bedtime,
+            initialWakeupTime = wakeupTime,
+            onDismiss = { showSleepDialog = false },
+            onConfirm = { newBedtime, newWakeupTime ->
+                scope.launch {
+                    sleepDataManager.saveSleepData(LocalDate.now(), SleepRecord(newBedtime, newWakeupTime))
+                }
+                showSleepDialog = false
+            }
+        )
+    }
+
+    if (showExerciseDialog) {
+        ExerciseTimeDialog(
+            initialRecord = exerciseRecord,
+            onDismiss = { showExerciseDialog = false },
+            onConfirm = { newRecord ->
+                scope.launch {
+                    exerciseDataManager.saveExerciseData(LocalDate.now(), newRecord)
+                }
+                showExerciseDialog = false
+            }
+        )
+    }
+
     val navItems = listOf(
         BottomNavItem("홈", R.drawable.home_icon, 30.dp),
         BottomNavItem("기록", R.drawable.ic_calander, 28.dp),
@@ -144,7 +233,14 @@ fun HealthCareAppScreen() {
             ) { tab ->
                 // 💡 이 분기문을 수정하여 화면을 연결합니다!
                 when (tab) {
-                    0 -> MainLayout()
+                    0 -> MainLayout(
+                        sleepHours = sleepHours,
+                        onSleepClick = { showSleepDialog = true },
+                        exerciseTitle = exerciseDisplayItems[exerciseDisplayIndex].first,
+                        exerciseValue = exerciseDisplayItems[exerciseDisplayIndex].second,
+                        exerciseUnit = exerciseDisplayItems[exerciseDisplayIndex].third,
+                        onExerciseClick = { showExerciseDialog = true }
+                    )
                     1 -> CalendarLayout() // 👈 DummyScreen 대신 방금 만든 달력 화면 파일 연결!
                     2 -> DummyScreen(title = "통계 화면 준비 중")
                     3 -> DummyScreen(title = "정보 화면 준비 중")
@@ -201,7 +297,14 @@ fun BottomNavTab(
 }
 
 @Composable
-fun MainLayout() {
+fun MainLayout(
+    sleepHours: String,
+    onSleepClick: () -> Unit,
+    exerciseTitle: String,
+    exerciseValue: String,
+    exerciseUnit: String,
+    onExerciseClick: () -> Unit
+) {
     val scrollState = rememberScrollState()
 
     Column(
@@ -303,8 +406,18 @@ fun MainLayout() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            SleepSummaryCard(modifier = Modifier.weight(1f))
-            ExerciseSummaryCard(modifier = Modifier.weight(1f))
+            SleepSummaryCard(
+                modifier = Modifier.weight(1f),
+                value = sleepHours,
+                onClick = onSleepClick
+            )
+            ExerciseSummaryCard(
+                modifier = Modifier.weight(1f),
+                title = exerciseTitle,
+                value = exerciseValue,
+                unit = exerciseUnit,
+                onClick = onExerciseClick
+            )
         }
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -334,11 +447,15 @@ data class MealRowData(
 
 @Composable
 fun SleepSummaryCard(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    value: String = "7",
+    onClick: () -> Unit = {}
 ) {
     Card(
         // 카드 전체 세로 크기
-        modifier = modifier.height(110.dp),
+        modifier = modifier
+            .height(110.dp)
+            .clickable { onClick() },
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
@@ -393,7 +510,7 @@ fun SleepSummaryCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = "7",
+                        text = value,
                         color = Color(0xFF1776C9),
                         // 큰 숫자 크기
                         fontSize = 36.sp,
@@ -428,11 +545,17 @@ fun SleepSummaryCard(
 
 @Composable
 fun ExerciseSummaryCard(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    title: String = "운동",
+    value: String = "30",
+    unit: String = "분",
+    onClick: () -> Unit = {}
 ) {
     Card(
         // 카드 전체 세로 크기
-        modifier = modifier.height(110.dp),
+        modifier = modifier
+            .height(110.dp)
+            .clickable { onClick() },
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
@@ -446,17 +569,15 @@ fun ExerciseSummaryCard(
             Box(
                 modifier = Modifier
                     // 아이콘이 차지하는 영역 크기
-                    .size(64.dp)
-                    .align(Alignment.CenterStart)
-                    // 아이콘 영역 좌우 위치
-                    .offset(x = 0.dp),
+                    .size(56.dp)
+                    .align(Alignment.CenterStart),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_walk),
-                    contentDescription = "운동",
+                    contentDescription = title,
                     // 실제 아이콘 표시 크기
-                    modifier = Modifier.size(55.dp),
+                    modifier = Modifier.size(48.dp),
                 )
             }
             Box(
@@ -466,44 +587,56 @@ fun ExerciseSummaryCard(
                     .height(64.dp)
                     .align(Alignment.CenterStart)
                     // 구분선 좌우 위치
-                    .offset(x = 66.dp)
+                    .offset(x = 58.dp)
                     .background(Color(0xFFE7EDF3))
             )
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
                     // 오른쪽 텍스트 영역 시작 위치와 폭
-                    .padding(start = 78.dp, end = 18.dp, top = 2.dp),
+                    .padding(start = 70.dp, end = 12.dp, top = 2.dp),
                 verticalArrangement = Arrangement.Top
             ) {
-                Text(
-                    text = "운동",
-                    color = Color(0xFF111111),
-                    // 제목 글자 크기
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    Text(
-                        text = "30",
-                        color = Color(0xFF21B8BE),
-                        // 왼쪽 값 글자 크기
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Text(
-                        text = "분",
-                        color = Color(0xFF21B8BE),
-                        // 오른쪽 값 글자 크기
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        // 값 텍스트 간격/위치 조정
-                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-                    )
+                // 자연스러운 전환 애니메이션 (제목과 내용 모두 포함)
+                androidx.compose.animation.AnimatedContent(
+                    targetState = Triple(title, value, unit),
+                    transitionSpec = {
+                        (fadeIn() + scaleIn()).togetherWith(fadeOut() + scaleOut())
+                    },
+                    label = "HomeExerciseCardAnimation"
+                ) { (currentTitle, currentValue, currentUnit) ->
+                    Column {
+                        Text(
+                            text = currentTitle,
+                            color = Color(0xFF111111),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            val fontSize = when {
+                                currentValue.length > 5 -> 22.sp
+                                currentValue.length > 4 -> 26.sp
+                                else -> 32.sp
+                            }
+                            Text(
+                                text = currentValue,
+                                color = Color(0xFF21B8BE),
+                                fontSize = fontSize,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = currentUnit,
+                                color = Color(0xFF21B8BE),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(start = 2.dp, bottom = 2.dp),
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
             Text(
