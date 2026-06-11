@@ -39,9 +39,21 @@ class ExerciseDataManager(private val context: Context) {
 }
 
 data class ExerciseRecord(
+    // 기존 steps 저장 키를 유지하되, UI에서는 걷기 시간(분)으로 사용합니다.
     val steps: String = "0",
     val runTime: String = "0",
     val runDistance: String = "0",
     val cycleTime: String = "0",
     val cycleDistance: String = "0"
-)
+) {
+    val walkTime: String
+        get() = steps
+
+    fun totalExerciseMinutes(): Int {
+        return walkTime.toIntOrNull().orZero() +
+            runTime.toIntOrNull().orZero() +
+            cycleTime.toIntOrNull().orZero()
+    }
+}
+
+private fun Int?.orZero(): Int = this ?: 0

@@ -2,6 +2,7 @@ package com.sss.healthcare
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -34,6 +35,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 // DataStore for Medication list
 private val Context.medicationListStore by preferencesDataStore(name = "medication_list_records")
@@ -42,21 +44,20 @@ class MedicationListManager(private val context: Context) {
     fun getMedicationList(date: LocalDate): Flow<List<MedicationItem>> {
         val dateStr = date.toString()
         return context.medicationListStore.data.map { preferences ->
-            val rawData = preferences[stringPreferencesKey("meds_$dateStr")] ?: ""
-            if (rawData.isEmpty()) emptyList()
-            else {
-                rawData.split("^").mapNotNull { token ->
-                    val parts = token.split("|")
-                    if (parts.size >= 6) {
-                        MedicationItem(
-                            name = parts[0],
-                            time = parts[1],
-                            period = parts[2],
-                            useNotification = parts[3].toBoolean(),
-                            notificationTime = parts[4],
-                            isTaken = parts[5].toBoolean()
-                        )
-                    } else null
+            val globalRawData = preferences[stringPreferencesKey("meds_global")] ?: ""
+            val legacyDateRawData = preferences[stringPreferencesKey("meds_$dateStr")] ?: ""
+            val takenKeys = preferences[stringPreferencesKey("meds_taken_$dateStr")]
+                ?.split("^")
+                ?.filter { it.isNotBlank() }
+                ?.toSet()
+                ?: emptySet()
+
+            val sourceData = globalRawData.ifBlank { legacyDateRawData }
+            if (sourceData.isEmpty()) {
+                emptyList()
+            } else {
+                sourceData.toMedicationItems().map { item ->
+                    item.copy(isTaken = medicationIdentity(item) in takenKeys || item.isTaken && globalRawData.isBlank())
                 }
             }
         }
@@ -64,12 +65,41 @@ class MedicationListManager(private val context: Context) {
 
     suspend fun saveMedicationList(date: LocalDate, items: List<MedicationItem>) {
         val dateStr = date.toString()
-        val serialized = items.joinToString("^") {
-            "${it.name}|${it.time}|${it.period}|${it.useNotification}|${it.notificationTime}|${it.isTaken}"
+        val serializedMedicationList = items.joinToString("^") {
+            "${it.name}|${it.time}|${it.period}|${it.useNotification}|${it.notificationTime}|false"
         }
+        val serializedTakenList = items
+            .filter { it.isTaken }
+            .joinToString("^") {
+                medicationIdentity(it)
+            }
+
         context.medicationListStore.edit { preferences ->
-            preferences[stringPreferencesKey("meds_$dateStr")] = serialized
+            preferences[stringPreferencesKey("meds_global")] = serializedMedicationList
+            preferences[stringPreferencesKey("meds_taken_$dateStr")] = serializedTakenList
         }
+    }
+
+    private fun String.toMedicationItems(): List<MedicationItem> {
+        return split("^").mapNotNull { token ->
+            val parts = token.split("|")
+            if (parts.size >= 6) {
+                MedicationItem(
+                    name = parts[0],
+                    time = parts[1],
+                    period = parts[2],
+                    useNotification = parts[3].toBoolean(),
+                    notificationTime = parts[4],
+                    isTaken = parts[5].toBoolean()
+                )
+            } else {
+                null
+            }
+        }
+    }
+
+    private fun medicationIdentity(item: MedicationItem): String {
+        return listOf(item.name, item.time, item.period).joinToString("|")
     }
 }
 
@@ -97,18 +127,48 @@ fun MedicationRecordDialog(
     val coroutineScope = rememberCoroutineScope()
     var currentScreen by remember { mutableStateOf(MedicationDialogScreen.MAIN) }
     var medicationList by remember { mutableStateOf(listOf<MedicationItem>()) }
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
 
     // Form inputs for Screen B (Add Medication)
     var newMedName by remember { mutableStateOf("") }
     var newMedTime by remember { mutableStateOf("08:00") }
     var newMedPeriod by remember { mutableStateOf("매일") }
+    var customPeriodDays by remember { mutableStateOf("2") }
+    var showCustomPeriodDialog by remember { mutableStateOf(false) }
     var useNotification by remember { mutableStateOf(true) }
     var notificationTime by remember { mutableStateOf("정각에 알림") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
 
     LaunchedEffect(date) {
         dataManager.getMedicationList(date).collect { list ->
             medicationList = list
         }
+    }
+
+    fun resetMedicationForm() {
+        editingIndex = null
+        newMedName = ""
+        newMedTime = "08:00"
+        newMedPeriod = "매일"
+        customPeriodDays = "2"
+        useNotification = true
+        notificationTime = "정각에 알림"
+    }
+
+    fun openAddScreen() {
+        resetMedicationForm()
+        currentScreen = MedicationDialogScreen.ADD
+    }
+
+    fun openEditScreen(index: Int, item: MedicationItem) {
+        editingIndex = index
+        newMedName = item.name
+        newMedTime = item.time
+        newMedPeriod = item.period
+        customPeriodDays = item.period.removeSuffix("일마다").takeIf { it.all(Char::isDigit) && it.isNotBlank() } ?: "2"
+        useNotification = item.useNotification
+        notificationTime = if (item.notificationTime == "없음") "정각에 알림" else item.notificationTime
+        currentScreen = MedicationDialogScreen.ADD
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -158,7 +218,15 @@ fun MedicationRecordDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(Color(0xFFF5F7F9), RoundedCornerShape(12.dp))
-                                        .clickable {
+                                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (item.isTaken) "☑" else "☐",
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (item.isTaken) Color(0xFF20C4C9) else Color(0xFFB9C5CA),
+                                        modifier = Modifier.clickable {
                                             val updated = medicationList.toMutableList().apply {
                                                 this[index] = item.copy(isTaken = !item.isTaken)
                                             }
@@ -167,14 +235,6 @@ fun MedicationRecordDialog(
                                                 dataManager.saveMedicationList(date, updated)
                                             }
                                         }
-                                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = if (item.isTaken) "☑" else "☐",
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (item.isTaken) Color(0xFF20C4C9) else Color(0xFFB9C5CA)
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(
@@ -190,6 +250,19 @@ fun MedicationRecordDialog(
                                         color = Color(0xFF7B8086),
                                         fontWeight = FontWeight.Medium
                                     )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "수정",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF20C4C9),
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .background(Color(0xFFE8FAFA), RoundedCornerShape(999.dp))
+                                            .clickable {
+                                                openEditScreen(index, item)
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    )
                                 }
                             }
                         }
@@ -201,7 +274,7 @@ fun MedicationRecordDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .border(1.5.dp, Color(0xFF20C4C9), RoundedCornerShape(12.dp))
-                            .clickable { currentScreen = MedicationDialogScreen.ADD }
+                            .clickable { openAddScreen() }
                             .padding(vertical = 12.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
@@ -235,7 +308,7 @@ fun MedicationRecordDialog(
                     horizontalAlignment = Alignment.Start
                 ) {
                     Text(
-                        text = "약 추가",
+                        text = if (editingIndex == null) "약 추가" else "약 수정",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF111111),
@@ -260,17 +333,39 @@ fun MedicationRecordDialog(
 
                     Text("복용 시간", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF555555))
                     Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = newMedTime,
-                        onValueChange = { newMedTime = it },
-                        placeholder = { Text("예: 08:00", color = Color(0xFFB9C5CA), fontSize = 13.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF20C4C9),
-                            unfocusedBorderColor = Color(0xFFE7EDF3)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color(0xFFE7EDF3), RoundedCornerShape(12.dp))
+                            .clickable {
+                                val currentTime = parseTimeSafely(newMedTime)
+                                TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        newMedTime = LocalTime.of(hour, minute).format(timeFormatter)
+                                    },
+                                    currentTime.hour,
+                                    currentTime.minute,
+                                    true
+                                ).show()
+                            }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = newMedTime,
+                            color = Color(0xFF111111),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    )
+                        Text(
+                            text = "시간 선택",
+                            color = Color(0xFF20C4C9),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     Spacer(modifier = Modifier.height(18.dp))
 
                     Text("복용 주기", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF555555))
@@ -280,16 +375,40 @@ fun MedicationRecordDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { newMedPeriod = periodOption }
+                                .clickable {
+                                    if (periodOption == "N일마다") {
+                                        showCustomPeriodDialog = true
+                                    } else {
+                                        newMedPeriod = periodOption
+                                    }
+                                }
                                 .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = (newMedPeriod == periodOption),
-                                onClick = { newMedPeriod = periodOption },
+                                selected = if (periodOption == "N일마다") {
+                                    newMedPeriod.endsWith("일마다") && newMedPeriod != "매일"
+                                } else {
+                                    newMedPeriod == periodOption
+                                },
+                                onClick = {
+                                    if (periodOption == "N일마다") {
+                                        showCustomPeriodDialog = true
+                                    } else {
+                                        newMedPeriod = periodOption
+                                    }
+                                },
                                 colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF20C4C9))
                             )
-                            Text(text = periodOption, fontSize = 14.sp, color = Color(0xFF333333))
+                            Text(
+                                text = if (periodOption == "N일마다" && newMedPeriod.endsWith("일마다") && newMedPeriod != "매일") {
+                                    newMedPeriod
+                                } else {
+                                    periodOption
+                                },
+                                fontSize = 14.sp,
+                                color = Color(0xFF333333)
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(18.dp))
@@ -336,12 +455,40 @@ fun MedicationRecordDialog(
 
                     Spacer(modifier = Modifier.height(28.dp))
 
+                    if (editingIndex != null) {
+                        Button(
+                            onClick = {
+                                val targetIndex = editingIndex
+                                if (targetIndex != null && targetIndex in medicationList.indices) {
+                                    val updatedList = medicationList.toMutableList().apply {
+                                        removeAt(targetIndex)
+                                    }
+                                    medicationList = updatedList
+                                    coroutineScope.launch {
+                                        dataManager.saveMedicationList(date, updatedList)
+                                    }
+                                    resetMedicationForm()
+                                    currentScreen = MedicationDialogScreen.MAIN
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFECEC)),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text("이 약 삭제", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Button(
-                            onClick = { currentScreen = MedicationDialogScreen.MAIN },
+                            onClick = {
+                                resetMedicationForm()
+                                currentScreen = MedicationDialogScreen.MAIN
+                            },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE7EDF3)),
                             shape = RoundedCornerShape(14.dp)
@@ -351,15 +498,26 @@ fun MedicationRecordDialog(
                         Button(
                             onClick = {
                                 if (newMedName.isNotBlank()) {
+                                    val targetIndex = editingIndex
+                                    val previousTaken = targetIndex
+                                        ?.takeIf { it in medicationList.indices }
+                                        ?.let { medicationList[it].isTaken }
+                                        ?: false
                                     val newItem = MedicationItem(
                                         name = newMedName,
                                         time = newMedTime,
                                         period = newMedPeriod,
                                         useNotification = useNotification,
                                         notificationTime = if (useNotification) notificationTime else "없음",
-                                        isTaken = false
+                                        isTaken = previousTaken
                                     )
-                                    val updatedList = medicationList + newItem
+                                    val updatedList = if (targetIndex != null && targetIndex in medicationList.indices) {
+                                        medicationList.toMutableList().apply {
+                                            this[targetIndex] = newItem
+                                        }
+                                    } else {
+                                        medicationList + newItem
+                                    }
                                     medicationList = updatedList
                                     coroutineScope.launch {
                                         dataManager.saveMedicationList(date, updatedList)
@@ -390,8 +548,7 @@ fun MedicationRecordDialog(
                                         }
                                     }
 
-                                    newMedName = ""
-                                    newMedTime = "08:00"
+                                    resetMedicationForm()
                                     currentScreen = MedicationDialogScreen.MAIN
                                 }
                             },
@@ -399,12 +556,64 @@ fun MedicationRecordDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF20C4C9)),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Text("저장", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(if (editingIndex == null) "저장" else "수정 저장", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
+    }
+
+    if (showCustomPeriodDialog) {
+        AlertDialog(
+            onDismissRequest = { showCustomPeriodDialog = false },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("복용 주기 설정", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "몇 일마다 복용할지 입력해주세요.",
+                        color = Color(0xFF7B8086),
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = customPeriodDays,
+                        onValueChange = { input ->
+                            customPeriodDays = input.filter { it.isDigit() }.take(3)
+                        },
+                        singleLine = true,
+                        suffix = { Text("일마다") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF20C4C9),
+                            unfocusedBorderColor = Color(0xFFE7EDF3)
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val days = customPeriodDays.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                        customPeriodDays = days.toString()
+                        newMedPeriod = "${days}일마다"
+                        showCustomPeriodDialog = false
+                    }
+                ) {
+                    Text("확인", color = Color(0xFF20C4C9), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomPeriodDialog = false }) {
+                    Text("취소", color = Color(0xFF7B8086))
+                }
+            }
+        )
     }
 }
 
@@ -441,7 +650,10 @@ fun setMedicationAlarm(context: Context, triggerTimeMs: Long, medicationName: St
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+        // 정확한 알람 권한이 꺼진 기기에서도 앱이 크래시 나지 않도록 일반 알람으로 대체합니다.
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMs, pendingIntent)
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMs, pendingIntent)
     } else {
         alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTimeMs, pendingIntent)

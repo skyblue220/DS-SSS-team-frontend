@@ -36,14 +36,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sss.healthcare.ui.theme.HealthCareTheme
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalContext
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Duration
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-
+import kotlin.math.roundToInt
 
 
 
@@ -78,6 +77,9 @@ fun HealthCareAppScreen() {
     val context = LocalContext.current
     val sleepDataManager = remember { SleepDataManager(context) }
     val exerciseDataManager = remember { ExerciseDataManager(context) }
+    val mealDataManager = remember { MealDataManager(context) }
+    val diseaseDataManager = remember { DiseaseDataManager(context) }
+    val medicationListManager = remember { MedicationListManager(context) }
     val scope = rememberCoroutineScope()
 
     // 0: 홈, 1: 기록, 2: 통계, 3: 정보
@@ -94,10 +96,14 @@ fun HealthCareAppScreen() {
     var showExerciseDialog by remember { mutableStateOf(false) }
     var exerciseRecord by remember { mutableStateOf(ExerciseRecord()) }
 
+    // 오늘 식사 기록 상태
+    var mealRecord by remember { mutableStateOf(MealRecord()) }
+    var weeklyHealthScore by remember { mutableIntStateOf(0) }
+
     // 운동 카드 순환 노출을 위한 상태 (홈 화면용)
     var exerciseDisplayIndex by remember { mutableStateOf(0) }
     val exerciseDisplayItems = listOf(
-        Triple("걷기", exerciseRecord.steps, "steps"),
+        Triple("걷기", exerciseRecord.walkTime, "분"),
         Triple("달리기", exerciseRecord.runTime, "분"),
         Triple("달리기", exerciseRecord.runDistance, "km"),
         Triple("자전거", exerciseRecord.cycleTime, "분"),
@@ -110,6 +116,22 @@ fun HealthCareAppScreen() {
             kotlinx.coroutines.delay(4000)//홈화면 (운동버튼 정보 변경주기)
             exerciseDisplayIndex = (exerciseDisplayIndex + 1) % exerciseDisplayItems.size
         }
+    }
+
+    LaunchedEffect(selectedTab, showInitialSetup, showProfileSettings) {
+        val selectedDisease = ProfileSettingsStore.load(context).selectedDisease
+        val diseaseType = diseaseTypeFromName(selectedDisease)
+        val recentDates = (6 downTo 0).map { LocalDate.now().minusDays(it.toLong()) }
+        val scores = recentDates.map { date ->
+            val diseaseRecord = diseaseDataManager.getDiseaseData(date).first()
+            val medicationItems = medicationListManager.getMedicationList(date).first()
+            calculateHealthScore(
+                diseaseType = diseaseType,
+                record = diseaseRecord,
+                medicationStatus = calculateMedicationStatus(medicationItems, date)
+            )
+        }
+        weeklyHealthScore = scores.average().roundToInt().coerceIn(0, 100)
     }
 
     // 오늘 날짜 데이터 로드
@@ -128,6 +150,22 @@ fun HealthCareAppScreen() {
             exerciseDataManager.getExerciseData(LocalDate.now()).collect { record ->
                 exerciseRecord = record ?: ExerciseRecord()
             }
+        }
+        // 식사 데이터 로드
+        launch {
+            mealDataManager.getMealData(LocalDate.now()).collect { record ->
+                mealRecord = record ?: MealRecord()
+            }
+        }
+        // 발표/시연용 최근 2주 데이터 자동 생성
+        launch {
+            DemoDataSeeder.seedRecentTwoWeeksIfNeeded(
+                context = context,
+                sleepDataManager = sleepDataManager,
+                exerciseDataManager = exerciseDataManager,
+                diseaseDataManager = diseaseDataManager,
+                medicationListManager = medicationListManager
+            )
         }
     }
 
@@ -262,6 +300,8 @@ fun HealthCareAppScreen() {
                             exerciseValue = exerciseDisplayItems[exerciseDisplayIndex].second,
                             exerciseUnit = exerciseDisplayItems[exerciseDisplayIndex].third,
                             onExerciseClick = { showExerciseDialog = true },
+                            mealRecord = mealRecord,
+                            weeklyHealthScore = weeklyHealthScore,
                             onProfileClick = { showProfileSettings = true }
                         )
                         1 -> CalendarLayout() // 👈 DummyScreen 대신 방금 만든 달력 화면 파일 연결!
@@ -344,20 +384,19 @@ fun MainLayout(
     exerciseValue: String,
     exerciseUnit: String,
     onExerciseClick: () -> Unit,
+    mealRecord: MealRecord = MealRecord(),
+    weeklyHealthScore: Int = 0,
     onProfileClick: () -> Unit = {}
 ) {
-    val scrollState = rememberScrollState()
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF2FFFF))
-            .verticalScroll(scrollState)
             .padding(
                 start = 20.dp,
                 end = 20.dp,
                 top = 18.dp,
-                bottom = 80.dp // 하단 탭바 높이만큼 여유 공간 확보!
+                bottom = 12.dp // Scaffold가 하단 탭바 여백을 이미 잡아주므로 최소 여백만 둠
             )
     ) {
         Row(
@@ -394,7 +433,7 @@ fun MainLayout(
             )
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Card(
             modifier = Modifier.fillMaxWidth().aspectRatio(1.64f),
@@ -430,7 +469,7 @@ fun MainLayout(
                         )
                     }
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text(text = "83", color = Color.White, fontSize = 74.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(text = weeklyHealthScore.toString(), color = Color.White, fontSize = 74.sp, fontWeight = FontWeight.ExtraBold)
                         Text(text = " 점", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp, bottom = 12.dp))
                     }
                     Column(
@@ -443,7 +482,7 @@ fun MainLayout(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -463,21 +502,17 @@ fun MainLayout(
             )
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         MealCard(
             meals = listOf(
-                MealRowData("아침", "바나나, 우유", Color(0xFFFFF5E8), Color(0xFFFF6B00)),
-                MealRowData("점심", "김치볶음밥", Color(0xFFEAF9F0), Color(0xFF148847)),
-                MealRowData("저녁", "아직 입력하지 않음", Color(0xFFF4ECFF), Color(0xFF8E2DE2))
+                MealRowData("아침", mealRecord.breakfast.ifBlank { "아직 입력하지 않음" }, Color(0xFFFFF5E8), Color(0xFFFF6B00)),
+                MealRowData("점심", mealRecord.lunch.ifBlank { "아직 입력하지 않음" }, Color(0xFFEAF9F0), Color(0xFF148847)),
+                MealRowData("저녁", mealRecord.dinner.ifBlank { "아직 입력하지 않음" }, Color(0xFFF4ECFF), Color(0xFF8E2DE2))
             )
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
-
-        RecordCard()
-
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(0.dp))
     }
 }
 
@@ -699,21 +734,22 @@ fun ExerciseSummaryCard(
 
 @Composable
 fun MealCard(
+    modifier: Modifier = Modifier,
     meals: List<MealRowData>
 ) {
     Card(
         // 식사 카드 전체 가로 폭
         // 카드 자체 높이를 직접 줄이고 싶으면 .height(...) 또는 .heightIn(...)를 여기 modifier에 추가
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .heightIn(max = 240.dp),
+            .height(230.dp),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             // 식사 카드 내부 전체 여백
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -745,7 +781,7 @@ fun MealCard(
             }
 
             // 제목 영역과 첫 식사 줄 사이 간격
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             meals.forEachIndexed { index, meal ->
                 MealRow(meal = meal)
@@ -776,7 +812,7 @@ fun MealRow(meal: MealRowData) {
         Box(
             modifier = Modifier
                 // 아침/점심/저녁 배지 가로 크기
-                .width(60 .dp)
+                .width(60.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(meal.badgeBackground)
                 // 배지 내부 여백
@@ -795,10 +831,11 @@ fun MealRow(meal: MealRowData) {
         Spacer(modifier = Modifier.width(14.dp))
         Text(
             text = meal.content,
-            color = if (meal.label == "저녁") Color(0xFF7D868C) else Color(0xFF1D2D45),
+            color = Color(0xFF1D2D45),
             // 식사 내용 글자 크기
             fontSize = 13.sp,
-            fontWeight = if (meal.label == "저녁") FontWeight.SemiBold else FontWeight.Medium
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }

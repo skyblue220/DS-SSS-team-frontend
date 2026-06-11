@@ -77,7 +77,7 @@ fun CalendarLayout() {
     // 운동 카드 순환 노출을 위한 상태
     var exerciseDisplayIndex by remember { mutableStateOf(0) }
     val exerciseDisplayItems = listOf(
-        Triple("걷기", exerciseRecord.steps, "steps"),
+        Triple("걷기", exerciseRecord.walkTime, "분"),
         Triple("달리기", exerciseRecord.runTime, "분"),
         Triple("달리기", exerciseRecord.runDistance, "km"),
         Triple("자전거", exerciseRecord.cycleTime, "분"),
@@ -191,105 +191,116 @@ fun CalendarLayout() {
     ) {
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 1. 연도/월 선택 헤더
-        Row(
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
-            IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_arrow_left),
-                    contentDescription = "이전 달",
-                    tint = MINT_COLOR,          // ✅ 통일된 민트 컬러 적용
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Text(
-                text = "${currentMonth.year}년 ${currentMonth.monthValue}월",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF3A3A3A)
-            )
-            IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_arrow_right),
-                    contentDescription = "다음 달",
-                    tint = MINT_COLOR,          // ✅ 통일된 민트 컬러 적용
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
+            ) {
+                // 1. 연도/월 선택 헤더
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_arrow_left),
+                            contentDescription = "이전 달",
+                            tint = MINT_COLOR,          // ✅ 통일된 민트 컬러 적용
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Text(
+                        text = "${currentMonth.year}년 ${currentMonth.monthValue}월",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF3A3A3A)
+                    )
+                    IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_arrow_right),
+                            contentDescription = "다음 달",
+                            tint = MINT_COLOR,          // ✅ 통일된 민트 컬러 적용
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
 
-        Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-        // ── 2. 요일 헤더 ─────────────────────────────────────────────
-        val daysOfWeek = listOf("일", "월", "화", "수", "목", "금", "토")
-        Row(modifier = Modifier.fillMaxWidth()) {
-            daysOfWeek.forEach { day ->
-                Text(
-                    text = day,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    fontSize = 13.sp,
-                    color = when (day) {
-                        "일" -> Color(0xFFE53935)
-                        "토" -> Color(0xFF1E73E8)
-                        else -> Color(0xFF78909C)
-                    },
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 3. 날짜 그리드
-        val firstDayOfMonth = currentMonth.atDay(1).dayOfWeek.value % 7
-        val daysInMonth = currentMonth.lengthOfMonth()
-
-        val calendarDays = mutableListOf<Int?>()
-        repeat(firstDayOfMonth) { calendarDays.add(null) }
-        for (i in 1..daysInMonth) { calendarDays.add(i) }
-
-        val rows = (calendarDays.size + 6) / 7
-        Column {
-            for (r in 0 until rows) {
+                // ── 2. 요일 헤더 ─────────────────────────────────────────────
+                val daysOfWeek = listOf("일", "월", "화", "수", "목", "금", "토")
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    for (c in 0 until 7) {
-                        val index = r * 7 + c
-                        val day = if (index < calendarDays.size) calendarDays[index] else null
+                    daysOfWeek.forEach { day ->
+                        Text(
+                            text = day,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            fontSize = 12.sp,
+                            color = when (day) {
+                                "일" -> Color(0xFFE53935)
+                                "토" -> Color(0xFF1E73E8)
+                                else -> Color(0xFF78909C)
+                            },
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
-                        // ✅ [핵심] 선택 여부 판별: 현재 달 + 해당 일 == selectedDate
-                        val isSelected = day != null &&
-                                currentMonth.atDay(day) == selectedDate
+                Spacer(modifier = Modifier.height(8.dp))
 
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .padding(4.dp)
-                                .clip(CircleShape)
-                                // ✅ [하이라이트] 선택된 날짜: 민트 원형 배경 / 미선택: 투명
-                                .background(
-                                    if (isSelected) MINT_COLOR else Color.Transparent
-                                )
-                                // ✅ [클릭] day가 null이 아닐 때만 클릭 활성화
-                                .clickable(enabled = day != null) {
+                // 3. 날짜 그리드
+                val firstDayOfMonth = currentMonth.atDay(1).dayOfWeek.value % 7
+                val daysInMonth = currentMonth.lengthOfMonth()
+
+                val calendarDays = mutableListOf<Int?>()
+                repeat(firstDayOfMonth) { calendarDays.add(null) }
+                for (i in 1..daysInMonth) { calendarDays.add(i) }
+
+                val rows = (calendarDays.size + 6) / 7
+                Column {
+                    for (r in 0 until rows) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            for (c in 0 until 7) {
+                                val index = r * 7 + c
+                                val day = if (index < calendarDays.size) calendarDays[index] else null
+
+                                // ✅ [핵심] 선택 여부 판별: 현재 달 + 해당 일 == selectedDate
+                                val isSelected = day != null &&
+                                        currentMonth.atDay(day) == selectedDate
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .padding(4.dp)
+                                        .clip(CircleShape)
+                                        // ✅ [하이라이트] 선택된 날짜: 민트 원형 배경 / 미선택: 투명
+                                        .background(
+                                            if (isSelected) MINT_COLOR else Color.Transparent
+                                        )
+                                        // ✅ [클릭] day가 null이 아닐 때만 클릭 활성화
+                                        .clickable(enabled = day != null) {
+                                            if (day != null) {
+                                                selectedDate = currentMonth.atDay(day)
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     if (day != null) {
-                                        selectedDate = currentMonth.atDay(day)
+                                        Text(
+                                            text = day.toString(),
+                                            // ✅ [텍스트 색상] 선택됨 → 흰색 / 미선택 → 기존 색상 유지
+                                            color = if (isSelected) Color.White else Color(0xFF3A3A3A),
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
                                     }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (day != null) {
-                                Text(
-                                    text = day.toString(),
-                                    // ✅ [텍스트 색상] 선택됨 → 흰색 / 미선택 → 기존 색상 유지
-                                    color = if (isSelected) Color.White else Color(0xFF3A3A3A),
-                                    fontSize = 15.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                )
+                                }
                             }
                         }
                     }
@@ -341,7 +352,7 @@ fun CalendarLayout() {
         Spacer(modifier = Modifier.height(18.dp))
         CalendarMedicineRecordSection(onClick = { showMedicineDialog = true })
 
-        Spacer(modifier = Modifier.height(80.dp))
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -352,7 +363,7 @@ fun ExerciseTimeDialog(
     onDismiss: () -> Unit,
     onConfirm: (ExerciseRecord) -> Unit
 ) {
-    var steps by remember { mutableStateOf(initialRecord.steps) }
+    var walkTime by remember { mutableStateOf(initialRecord.walkTime) }
     var runTime by remember { mutableStateOf(initialRecord.runTime) }
     var runDist by remember { mutableStateOf(initialRecord.runDistance) }
     var cycleTime by remember { mutableStateOf(initialRecord.cycleTime) }
@@ -370,8 +381,8 @@ fun ExerciseTimeDialog(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                ExerciseInputSection(title = "걷기", label1 = "걸음 수") {
-                    ExerciseInputField(value = steps, unit = "steps", onValueChange = { steps = it })
+                ExerciseInputSection(title = "걷기", label1 = "걸은 시간") {
+                    ExerciseInputField(value = walkTime, unit = "min", onValueChange = { walkTime = it })
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -399,7 +410,7 @@ fun ExerciseTimeDialog(
                         modifier = Modifier
                             .width(110.dp).height(56.dp)
                             .background(Brush.horizontalGradient(listOf(Color(0xFF21B8BE), Color(0xFF5DB3FF))), RoundedCornerShape(24.dp))
-                            .clickable { onConfirm(ExerciseRecord(steps, runTime, runDist, cycleTime, cycleDist)) },
+                            .clickable { onConfirm(ExerciseRecord(walkTime, runTime, runDist, cycleTime, cycleDist)) },
                         contentAlignment = Alignment.Center
                     ) {
                         Text("기록 저장", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -738,6 +749,29 @@ fun MealInputDialog(
     var dinner by remember { mutableStateOf(initialRecord.dinner) }
     var snack by remember { mutableStateOf(initialRecord.snack) }
     var nightSnack by remember { mutableStateOf(initialRecord.nightSnack) }
+    var editingMealLabel by remember { mutableStateOf<String?>(null) }
+    var editingMealValue by remember { mutableStateOf("") }
+
+    fun currentMealValue(label: String): String {
+        return when (label) {
+            "아침" -> breakfast
+            "점심" -> lunch
+            "저녁" -> dinner
+            "간식" -> snack
+            "야식" -> nightSnack
+            else -> ""
+        }
+    }
+
+    fun updateMealValue(label: String, value: String) {
+        when (label) {
+            "아침" -> breakfast = value
+            "점심" -> lunch = value
+            "저녁" -> dinner = value
+            "간식" -> snack = value
+            "야식" -> nightSnack = value
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -760,14 +794,9 @@ fun MealInputDialog(
                 )
 
                 categories.forEach { (label, value, color) ->
-                    MealInputRow(label, value, color) { newValue ->
-                        when(label) {
-                            "아침" -> breakfast = newValue
-                            "점심" -> lunch = newValue
-                            "저녁" -> dinner = newValue
-                            "간식" -> snack = newValue
-                            "야식" -> nightSnack = newValue
-                        }
+                    MealInputRow(label, value, color) {
+                        editingMealLabel = label
+                        editingMealValue = currentMealValue(label)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                 }
@@ -788,36 +817,91 @@ fun MealInputDialog(
             }
         }
     }
+
+    val activeLabel = editingMealLabel
+    if (activeLabel != null) {
+        AlertDialog(
+            onDismissRequest = { editingMealLabel = null },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(22.dp),
+            title = {
+                Text(
+                    text = "$activeLabel 식사 입력",
+                    color = Color(0xFF1D2D45),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                OutlinedTextField(
+                    value = editingMealValue,
+                    onValueChange = { editingMealValue = it },
+                    placeholder = {
+                        Text(
+                            text = "예: 바나나, 우유",
+                            color = Color(0xFF9EABB8)
+                        )
+                    },
+                    singleLine = false,
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF21B8BE),
+                        unfocusedBorderColor = Color(0xFFE6EEF4)
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        updateMealValue(activeLabel, editingMealValue.trim())
+                        editingMealLabel = null
+                    }
+                ) {
+                    Text("입력", color = Color(0xFF21B8BE), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        editingMealValue = ""
+                        updateMealValue(activeLabel, "")
+                        editingMealLabel = null
+                    }
+                ) {
+                    Text("비우기", color = Color(0xFF9EABB8), fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun MealInputRow(label: String, value: String, color: Color, onValueChange: (String) -> Unit) {
+fun MealInputRow(label: String, value: String, color: Color, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
             .background(Color(0xFFF0F9FA), RoundedCornerShape(20.dp))
+            .clickable { onClick() }
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(label, color = color, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                androidx.compose.foundation.text.BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFF5A5A5A), fontSize = 13.sp),
-                    decorationBox = { innerTextField ->
-                        if (value.isEmpty()) {
-                            Text("${label} 식사를 입력하세요", color = Color(0xFF9EABB8), fontSize = 13.sp)
-                        }
-                        innerTextField()
-                    }
+                Text(
+                    text = value.ifBlank { "${label} 식사를 입력하세요" },
+                    color = if (value.isBlank()) Color(0xFF9EABB8) else Color(0xFF1D2D45),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
                 )
             }
             Box(
                 modifier = Modifier
                     .size(32.dp)
+                    .clickable { onClick() }
                     .background(brush = Brush.horizontalGradient(listOf(Color(0xFF21B8BE), Color(0xFF5DB3FF))), shape = CircleShape),
                 contentAlignment = Alignment.Center
             ) {
