@@ -36,6 +36,8 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Icon
 
+private val MINT_COLOR = Color(0xFF20C4C0)
+
 @Composable
 fun CalendarLayout() {
     val MINT_COLOR = Color(0xFF00A896)

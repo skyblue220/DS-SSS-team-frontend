@@ -63,7 +63,9 @@ fun HealthCareAppScreen() {
 
     // 0: 홈, 1: 기록, 2: 통계, 3: 정보
     var selectedTab by remember { mutableIntStateOf(0) }
-    
+    var showProfileSettings by remember { mutableStateOf(false) }
+    var showInitialSetup by remember { mutableStateOf(true) }
+
     // 수면 기록 상태
     var bedtime by remember { mutableStateOf(LocalTime.of(23, 0)) }
     var wakeupTime by remember { mutableStateOf(LocalTime.of(7, 0)) }
@@ -150,102 +152,121 @@ fun HealthCareAppScreen() {
     )
     val indicatorWidth = 44.dp
 
-    Scaffold(
-        containerColor = Color(0xFFF2FFFF),
-        bottomBar = {
-            val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF2FFFF))
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = Color(0xFFF2FFFF),
+            bottomBar = {
+                val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF2FFFF))
                 ) {
-                    Surface(
-                        color = Color.White,
-                        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-                        tonalElevation = 0.dp,
-                        shadowElevation = 0.dp
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        BoxWithConstraints(
-                            modifier = Modifier.fillMaxWidth()
+                        Surface(
+                            color = Color.White,
+                            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+                            tonalElevation = 0.dp,
+                            shadowElevation = 0.dp
                         ) {
-                            val horizontalPadding = 18.dp
-                            val availableWidth = maxWidth - (horizontalPadding * 2)
-                            val tabWidth = availableWidth / navItems.size
-                            val indicatorOffset by animateDpAsState(
-                                targetValue = horizontalPadding + (tabWidth * selectedTab) + ((tabWidth - indicatorWidth) / 2),
-                                animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
-                                label = "bottomNavIndicatorOffset"
-                            )
-
-                            Box(
-                                modifier = Modifier
-                                    .offset(x = indicatorOffset)
-                                    .width(indicatorWidth)
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(Color(0xFF20C4C9))
-                            )
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = horizontalPadding, end = horizontalPadding, top = 0.dp, bottom = 4.dp),
+                            BoxWithConstraints(
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                navItems.forEachIndexed { index, item ->
-                                    BottomNavTab(
-                                        item = item,
-                                        selected = selectedTab == index,
-                                        onClick = { selectedTab = index },
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                val horizontalPadding = 18.dp
+                                val availableWidth = maxWidth - (horizontalPadding * 2)
+                                val tabWidth = availableWidth / navItems.size
+                                val indicatorOffset by animateDpAsState(
+                                    targetValue = horizontalPadding + (tabWidth * selectedTab) + ((tabWidth - indicatorWidth) / 2),
+                                    animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
+                                    label = "bottomNavIndicatorOffset"
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = indicatorOffset)
+                                        .width(indicatorWidth)
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color(0xFF20C4C9))
+                                )
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = horizontalPadding, end = horizontalPadding, top = 0.dp, bottom = 4.dp),
+                                ) {
+                                    navItems.forEachIndexed { index, item ->
+                                        BottomNavTab(
+                                            item = item,
+                                            selected = selectedTab == index,
+                                            onClick = { selectedTab = index },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
                                 }
                             }
                         }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(bottomInset)
+                                .background(Color.White)
+                        )
                     }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(bottomInset)
-                            .background(Color.White)
-                    )
+                }
+            }
+        )
+        { innerPadding ->
+            Box(modifier = Modifier.padding(innerPadding)) {
+                AnimatedContent(
+                    targetState = selectedTab,
+                    transitionSpec = {
+                        // 팀원이 작성한 슬라이드 애니메이션 로직 (그대로 유지)
+                        if (targetState > initialState) {
+                            slideInHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), initialOffsetX = { fullWidth -> fullWidth / 3 }) + fadeIn(animationSpec = tween(220)) togetherWith
+                                    slideOutHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), targetOffsetX = { fullWidth -> -fullWidth / 3 }) + fadeOut(animationSpec = tween(220))
+                        } else {
+                            slideInHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), initialOffsetX = { fullWidth -> -fullWidth / 3 }) + fadeIn(animationSpec = tween(220)) togetherWith
+                                    slideOutHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), targetOffsetX = { fullWidth -> fullWidth / 3 }) + fadeOut(animationSpec = tween(220))
+                        }
+                    },
+                    label = "screenTransition"
+                ) { tab ->
+                    // 💡 이 분기문을 수정하여 화면을 연결합니다!
+                    when (tab) {
+                        0 -> MainLayout(
+                            sleepHours = sleepHours,
+                            onSleepClick = { showSleepDialog = true },
+                            exerciseTitle = exerciseDisplayItems[exerciseDisplayIndex].first,
+                            exerciseValue = exerciseDisplayItems[exerciseDisplayIndex].second,
+                            exerciseUnit = exerciseDisplayItems[exerciseDisplayIndex].third,
+                            onExerciseClick = { showExerciseDialog = true },
+                            onProfileClick = { showProfileSettings = true }
+                        )
+                        1 -> CalendarLayout() // 👈 DummyScreen 대신 방금 만든 달력 화면 파일 연결!
+                        2 -> StatisticsLayout()
+                        3 -> InfoLayout()
+                    }
                 }
             }
         }
-    )
-    { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            AnimatedContent(
-                targetState = selectedTab,
-                transitionSpec = {
-                    // 팀원이 작성한 슬라이드 애니메이션 로직 (그대로 유지)
-                    if (targetState > initialState) {
-                        slideInHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), initialOffsetX = { fullWidth -> fullWidth / 3 }) + fadeIn(animationSpec = tween(220)) togetherWith
-                                slideOutHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), targetOffsetX = { fullWidth -> -fullWidth / 3 }) + fadeOut(animationSpec = tween(220))
-                    } else {
-                        slideInHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), initialOffsetX = { fullWidth -> -fullWidth / 3 }) + fadeIn(animationSpec = tween(220)) togetherWith
-                                slideOutHorizontally(animationSpec = tween(320, easing = FastOutSlowInEasing), targetOffsetX = { fullWidth -> fullWidth / 3 }) + fadeOut(animationSpec = tween(220))
-                    }
-                },
-                label = "screenTransition"
-            ) { tab ->
-                // 💡 이 분기문을 수정하여 화면을 연결합니다!
-                when (tab) {
-                    0 -> MainLayout(
-                        sleepHours = sleepHours,
-                        onSleepClick = { showSleepDialog = true },
-                        exerciseTitle = exerciseDisplayItems[exerciseDisplayIndex].first,
-                        exerciseValue = exerciseDisplayItems[exerciseDisplayIndex].second,
-                        exerciseUnit = exerciseDisplayItems[exerciseDisplayIndex].third,
-                        onExerciseClick = { showExerciseDialog = true }
-                    )
-                    1 -> CalendarLayout() // 👈 DummyScreen 대신 방금 만든 달력 화면 파일 연결!
-                    2 -> DummyScreen(title = "통계 화면 준비 중")
-                    3 -> DummyScreen(title = "정보 화면 준비 중")
-                }
-            }
+
+        if (showProfileSettings) {
+            ProfileSettingsDialog(onDismiss = { showProfileSettings = false })
+        }
+        if (showInitialSetup) {
+            ProfileSettingsDialog(
+                onDismiss = { showInitialSetup = false },
+                title = "최초 설정",
+                description = "사용자님이 관리할 질환을 선택해주세요.",
+                noticeText = "이 앱은 의료 진단 및 치료를 위한 서비스가 아니며, 기록을 바탕으로 참고 정보를 제공합니다.",
+                noticeFontSize = 8.sp,
+                noticeMaxLines = 2,
+                showBackButton = false,
+                dismissOnOutsideClick = false
+            )
         }
     }
 }
@@ -303,7 +324,8 @@ fun MainLayout(
     exerciseTitle: String,
     exerciseValue: String,
     exerciseUnit: String,
-    onExerciseClick: () -> Unit
+    onExerciseClick: () -> Unit,
+    onProfileClick: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
 
@@ -347,7 +369,9 @@ fun MainLayout(
             Image(
                 painter = painterResource(id = R.drawable.ic_user2),
                 contentDescription = "프로필",
-                modifier = Modifier.size(50.dp)
+                modifier = Modifier
+                    .size(50.dp)
+                    .clickable(onClick = onProfileClick)
             )
         }
 
