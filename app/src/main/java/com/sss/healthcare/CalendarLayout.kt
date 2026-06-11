@@ -123,7 +123,7 @@ fun CalendarLayout() {
                 scope.launch {
                     sleepDataManager.saveSleepData(selectedDate, SleepRecord(newBedtime, newWakeupTime))
                 }
-                showSleepDialog = false 
+                showSleepDialog = false
             }
         )
     }
@@ -296,8 +296,10 @@ fun CalendarLayout() {
         Spacer(modifier = Modifier.height(18.dp))
         CalendarMealSection(mealRecord) { showMealDialog = true }
         Spacer(modifier = Modifier.height(18.dp))
-        CalendarRecordSection()
-        Spacer(modifier = Modifier.height(40.dp))
+        CalendarDiseaseRecordSection()
+        Spacer(modifier = Modifier.height(18.dp))
+        CalendarMedicineRecordSection()
+        Spacer(modifier = Modifier.height(80.dp))
     }
 }
 
@@ -593,18 +595,18 @@ fun CalendarActivityCard(
                                 else -> 36.sp
                             }
                             Text(
-                                text = currentValue, 
-                                color = themeColor, 
-                                fontSize = fontSize, 
-                                fontWeight = FontWeight.ExtraBold, 
+                                text = currentValue,
+                                color = themeColor,
+                                fontSize = fontSize,
+                                fontWeight = FontWeight.ExtraBold,
                                 lineHeight = 34.sp,
                                 maxLines = 1
                             )
                             Text(
-                                text = currentUnit, 
-                                color = themeColor, 
+                                text = currentUnit,
+                                color = themeColor,
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.ExtraBold, 
+                                fontWeight = FontWeight.ExtraBold,
                                 modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
                                 maxLines = 1
                             )
@@ -807,22 +809,72 @@ fun MealInputRow(label: String, value: String, color: Color, onValueChange: (Str
 }
 
 @Composable
-fun CalendarRecordSection() {
+fun CalendarDiseaseRecordSection(onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(painter = painterResource(id = R.drawable.ic_heart), contentDescription = "오늘의 기록", modifier = Modifier.size(55.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.disease_record_icon),
+                contentDescription = "질환기록부",
+                modifier = Modifier.size(55.dp)
+            )
             Spacer(modifier = Modifier.width(12.dp))
             Box(modifier = Modifier.width(1.dp).height(56.dp).background(Color(0xFFE7EDF3)))
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("오늘의 기록", color = Color(0xFF111111), fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text("질환기록부", color = Color(0xFF111111), fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("오늘의 컨디션을 기록해요", color = Color(0xFF7B8086), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("질환 내역을 기록해요", color = Color(0xFF7B8086), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Icon(
+                painter = painterResource(id = R.drawable.ic_check_right),
+                contentDescription = null,
+                tint = Color(0xFFB9C5CA),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun CalendarMedicineRecordSection(onClick: () -> Unit = {}) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_medicine),
+                contentDescription = "복약기록부",
+                modifier = Modifier.size(55.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Box(modifier = Modifier.width(1.dp).height(56.dp).background(Color(0xFFE7EDF3)))
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("복약기록부", color = Color(0xFF111111), fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("복약 내역을 기록해요", color = Color(0xFF7B8086), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
             Icon(
                 painter = painterResource(id = R.drawable.ic_check_right),
