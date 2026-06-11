@@ -2,6 +2,7 @@ package com.sss.healthcare
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -35,6 +36,8 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Icon
+
+private val MINT_COLOR = Color(0xFF20C4C0)
 
 @Composable
 fun CalendarLayout() {
