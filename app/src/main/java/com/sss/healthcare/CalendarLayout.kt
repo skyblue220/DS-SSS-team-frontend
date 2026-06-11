@@ -1,6 +1,5 @@
 package com.sss.healthcare
 
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
@@ -37,6 +36,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Icon
+
 @Composable
 fun CalendarLayout() {
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
@@ -47,6 +47,11 @@ fun CalendarLayout() {
     val sleepDataManager = remember { SleepDataManager(context) }
     val exerciseDataManager = remember { ExerciseDataManager(context) }
     val mealDataManager = remember { MealDataManager(context) }
+
+    // 기존에 존재하던 질환/복약 매니저 정상 연결 ✅
+    val diseaseDataManager = remember { DiseaseDataManager(context) }
+    val medicationListManager = remember { MedicationListManager(context) }
+
     val scope = rememberCoroutineScope()
 
     // 수면 기록 상태
@@ -62,6 +67,10 @@ fun CalendarLayout() {
     var showMealDialog by remember { mutableStateOf(false) }
     var mealRecord by remember { mutableStateOf(MealRecord()) }
 
+    // 다이얼로그 오픈 여부 상태 변수
+    var showDiseaseDialog by remember { mutableStateOf(false) }
+    var showMedicineDialog by remember { mutableStateOf(false) }
+
     // 운동 카드 순환 노출을 위한 상태
     var exerciseDisplayIndex by remember { mutableStateOf(0) }
     val exerciseDisplayItems = listOf(
@@ -72,17 +81,16 @@ fun CalendarLayout() {
         Triple("자전거", exerciseRecord.cycleDistance, "km")
     )
 
-    // 2초마다 정보 전환 애니메이션 타이머
+    // 4초마다 정보 전환 애니메이션 타이머
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(4000)//4초 (운동버튼 정보 변경주기)
+            kotlinx.coroutines.delay(4000)
             exerciseDisplayIndex = (exerciseDisplayIndex + 1) % exerciseDisplayItems.size
         }
     }
 
     // 선택된 날짜의 데이터 로드
     LaunchedEffect(selectedDate) {
-        // 수면 데이터 로드
         launch {
             sleepDataManager.getSleepData(selectedDate).collect { record ->
                 if (record != null) {
@@ -94,13 +102,11 @@ fun CalendarLayout() {
                 }
             }
         }
-        // 운동 데이터 로드
         launch {
             exerciseDataManager.getExerciseData(selectedDate).collect { record ->
                 exerciseRecord = record ?: ExerciseRecord()
             }
         }
-        // 식사 데이터 로드
         launch {
             mealDataManager.getMealData(selectedDate).collect { record ->
                 mealRecord = record ?: MealRecord()
@@ -108,12 +114,13 @@ fun CalendarLayout() {
         }
     }
 
-    // 수면 시간 계산 (시간 단위만 추출)
+    // 수면 시간 계산
     val sleepDuration = Duration.between(bedtime, wakeupTime).let {
         if (it.isNegative || it.isZero) it.plusDays(1) else it
     }
     val sleepHours = sleepDuration.toHours().toString()
 
+    // --- [다이얼로그 제어 블록] ---
     if (showSleepDialog) {
         SleepTimeDialog(
             initialBedtime = bedtime,
@@ -154,16 +161,34 @@ fun CalendarLayout() {
         )
     }
 
+    // 개별 파일에 정의된 진짜 다이얼로그 컴포저블 호출 ✅
+    if (showDiseaseDialog) {
+        DiseaseRecordDialog(
+            dataManager = diseaseDataManager,
+            date = selectedDate,
+            onDismiss = { showDiseaseDialog = false }
+        )
+    }
+
+    if (showMedicineDialog) {
+        // 💡 참고: 만약 MedicationRecordDialog.kt 내부의 컴포저블 함수명이 다르면 그 이름으로 매칭해주세요!
+        MedicationRecordDialog(
+            dataManager = medicationListManager,
+            date = selectedDate,
+            onDismiss = { showMedicineDialog = false }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF2FFFF)) // MainActivity와 배경색 일치
+            .background(Color(0xFFF2FFFF))
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 1. 연도/월 선택 헤더 (PNG 화살표 적용)
+        // 1. 연도/월 선택 헤더
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -216,7 +241,7 @@ fun CalendarLayout() {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 3. 7열 날짜 그리드 생성
+        // 3. 날짜 그리드
         val firstDayOfMonth = currentMonth.atDay(1).dayOfWeek.value % 7
         val daysInMonth = currentMonth.lengthOfMonth()
 
@@ -271,7 +296,7 @@ fun CalendarLayout() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 5. 하단 데이터 카드 배치 (MainActivity 리소스 네이밍 동기화 완료)
+        // 5. 하단 데이터 카드 배치
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             CalendarActivityCard(
                 modifier = Modifier.weight(1f),
@@ -295,16 +320,18 @@ fun CalendarLayout() {
 
         Spacer(modifier = Modifier.height(18.dp))
         CalendarMealSection(mealRecord) { showMealDialog = true }
+
         Spacer(modifier = Modifier.height(18.dp))
-        CalendarDiseaseRecordSection()
+        CalendarDiseaseRecordSection(onClick = { showDiseaseDialog = true })
+
         Spacer(modifier = Modifier.height(18.dp))
-        CalendarMedicineRecordSection()
+        CalendarMedicineRecordSection(onClick = { showMedicineDialog = true })
+
         Spacer(modifier = Modifier.height(80.dp))
     }
 }
 
-// --- 운동 기록 팝업 (이미지 디자인 반영) ---
-
+// --- 운동 기록 팝업 ---
 @Composable
 fun ExerciseTimeDialog(
     initialRecord: ExerciseRecord,
@@ -329,14 +356,12 @@ fun ExerciseTimeDialog(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // 걷기 섹션
                 ExerciseInputSection(title = "걷기", label1 = "걸음 수") {
                     ExerciseInputField(value = steps, unit = "steps", onValueChange = { steps = it })
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 달리기 섹션
                 ExerciseInputSection(title = "달리기", label1 = "달린 시간", label2 = "달린 거리") {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         ExerciseInputField(modifier = Modifier.weight(1f), value = runTime, unit = "min", onValueChange = { runTime = it })
@@ -346,7 +371,6 @@ fun ExerciseTimeDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 자전거 섹션
                 ExerciseInputSection(title = "자전거", label1 = "운행 시간", label2 = "이동 거리") {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         ExerciseInputField(modifier = Modifier.weight(1f), value = cycleTime, unit = "min", onValueChange = { cycleTime = it })
@@ -356,7 +380,6 @@ fun ExerciseTimeDialog(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // 저장 버튼
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Box(
                         modifier = Modifier
@@ -413,6 +436,7 @@ fun ExerciseInputField(modifier: Modifier = Modifier, value: String, unit: Strin
     }
 }
 
+// --- 수면 기록 팝업 ---
 @Composable
 fun SleepTimeDialog(
     initialBedtime: LocalTime,
@@ -421,14 +445,10 @@ fun SleepTimeDialog(
     onConfirm: (LocalTime, LocalTime) -> Unit
 ) {
     val context = LocalContext.current
-
-    // 팝업 내부에서 변경할 시간 상태
     var bedtime by remember { mutableStateOf(initialBedtime) }
     var wakeupTime by remember { mutableStateOf(initialWakeupTime) }
-
     val timeFormatter = DateTimeFormatter.ofPattern("a hh:mm", Locale.US)
 
-    // 수면 시간 계산 로직 (자정을 넘기는 경우 처리)
     var duration = Duration.between(bedtime, wakeupTime)
     if (duration.isNegative || duration.isZero) {
         duration = duration.plusDays(1)
@@ -440,36 +460,17 @@ fun SleepTimeDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            modifier = Modifier
-                .width(340.dp)
-                .wrapContentHeight(),
+            modifier = Modifier.width(340.dp).wrapContentHeight(),
             shape = RoundedCornerShape(40.dp),
             color = Color.White
         ) {
-            Column(
-                modifier = Modifier.padding(28.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
-                Text(
-                    text = "수면 기록",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1D2D45)
-                )
-                Text(
-                    text = "오늘의 수면 시간을 입력해보세요",
-                    fontSize = 16.sp,
-                    color = Color(0xFF9EABB8),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+            Column(modifier = Modifier.padding(28.dp), horizontalAlignment = Alignment.Start) {
+                Text(text = "수면 기록", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D2D45))
+                Text(text = "오늘의 수면 시간을 입력해보세요", fontSize = 16.sp, color = Color(0xFF9EABB8), modifier = Modifier.padding(top = 4.dp))
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // 기상 시간 설정 버튼
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("기상 시간", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D2D45))
                         Spacer(modifier = Modifier.height(8.dp))
@@ -477,7 +478,7 @@ fun SleepTimeDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp)
-                                .background(Color(0xFFF0F9FA), RoundedCornerShape(20.dp))
+                                .background(Color(0xFFF0F9FA), RoundedCornerShape(20.dp) )
                                 .clickable {
                                     TimePickerDialog(context, { _, h, m ->
                                         wakeupTime = LocalTime.of(h, m)
@@ -488,7 +489,6 @@ fun SleepTimeDialog(
                             Text(wakeupTime.format(timeFormatter), color = Color(0xFF21B8BE), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-                    // 취침 시간 설정 버튼
                     Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("취침 시간", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D2D45))
                         Spacer(modifier = Modifier.height(8.dp))
@@ -511,17 +511,11 @@ fun SleepTimeDialog(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // 계산된 총 수면 시간 표시 (가로로 가득 채우기)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(80.dp)
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(Color(0xFF21B8BE), Color(0xFF5DB3FF))
-                            ),
-                            shape = RoundedCornerShape(24.dp)
-                        ),
+                        .background(brush = Brush.horizontalGradient(colors = listOf(Color(0xFF21B8BE), Color(0xFF5DB3FF))), shape = RoundedCornerShape(24.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -532,15 +526,10 @@ fun SleepTimeDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 기록 저장 버튼 (오른쪽 아래로 배치)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Box(
                         modifier = Modifier
-                            .width(100.dp)
-                            .height(56.dp)
+                            .width(100.dp).height(56.dp)
                             .background(Color(0xFF21B8BE), RoundedCornerShape(20.dp))
                             .clickable { onConfirm(bedtime, wakeupTime) },
                         contentAlignment = Alignment.Center
@@ -553,6 +542,7 @@ fun SleepTimeDialog(
     }
 }
 
+// --- 활동 카드 UI 컴포넌트 ---
 @Composable
 fun CalendarActivityCard(
     modifier: Modifier,
@@ -577,7 +567,6 @@ fun CalendarActivityCard(
             }
             Box(modifier = Modifier.width(1.dp).height(64.dp).align(Alignment.CenterStart).offset(x = 58.dp).background(Color(0xFFE7EDF3)))
             Column(modifier = Modifier.fillMaxHeight().padding(start = 70.dp, end = 12.dp, top = 2.dp), verticalArrangement = Arrangement.Top) {
-                // 자연스러운 전환을 위한 애니메이션 적용 (제목과 내용 모두 포함)
                 androidx.compose.animation.AnimatedContent(
                     targetState = Triple(title, value, unit),
                     transitionSpec = {
@@ -624,6 +613,7 @@ fun CalendarActivityCard(
     }
 }
 
+// --- 식사 기록 섹션 ---
 @Composable
 fun CalendarMealSection(meal: MealRecord, onClick: () -> Unit) {
     Card(
@@ -693,7 +683,6 @@ fun CalendarMealRow(meal: MealRowData) {
 }
 
 // --- 식사 기록 팝업 ---
-
 @Composable
 fun MealInputDialog(
     initialRecord: MealRecord,
@@ -741,7 +730,6 @@ fun MealInputDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 저장 버튼
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Box(
                         modifier = Modifier
@@ -786,28 +774,16 @@ fun MealInputRow(label: String, value: String, color: Color, onValueChange: (Str
             Box(
                 modifier = Modifier
                     .size(32.dp)
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            listOf(
-                                Color(0xFF21B8BE),
-                                Color(0xFF5DB3FF)
-                            )
-                        ),
-                        shape = CircleShape
-                    ),
+                    .background(brush = Brush.horizontalGradient(listOf(Color(0xFF21B8BE), Color(0xFF5DB3FF))), shape = CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "+",
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = "+", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
+// --- 하단 카드 섹션 컴포저블 ---
 @Composable
 fun CalendarDiseaseRecordSection(onClick: () -> Unit = {}) {
     Card(
