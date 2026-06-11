@@ -1,6 +1,8 @@
 package com.sss.healthcare
 
-
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -40,9 +42,6 @@ import java.time.LocalTime
 import java.time.Duration
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
 import kotlin.math.roundToInt
 
 
