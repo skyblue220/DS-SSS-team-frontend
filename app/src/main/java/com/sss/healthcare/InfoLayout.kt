@@ -124,7 +124,7 @@ fun InfoLayout() {
             .fillMaxSize()
             .background(Color(0xFFF2FFFF))
             .verticalScroll(rememberScrollState())
-            .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 118.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp)
     ) {
         if (isSearching) {
             SearchResultHeader(onBackClick = { searchText = "" })

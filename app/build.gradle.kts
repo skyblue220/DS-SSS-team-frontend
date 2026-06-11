@@ -15,6 +15,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "OPENAI_API_KEY", "\"\"")
     }
 
     buildTypes {
@@ -32,7 +33,9 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+
 }
 
 dependencies {
@@ -54,4 +57,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

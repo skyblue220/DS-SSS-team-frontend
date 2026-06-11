@@ -18,10 +18,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,12 +42,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
+import java.time.Duration
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private val StatisticsBackground = Color(0xFFF2FFFF)
@@ -52,20 +64,72 @@ private val ChartDateFormatter = DateTimeFormatter.ofPattern("M/d")
 
 @Composable
 fun StatisticsLayout() {
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
+    val sleepDataManager = remember { SleepDataManager(context) }
+    val exerciseDataManager = remember { ExerciseDataManager(context) }
+    val diseaseDataManager = remember { DiseaseDataManager(context) }
+    val medicationListManager = remember { MedicationListManager(context) }
+    val selectedDisease = remember { ProfileSettingsStore.load(context).selectedDisease }
+    val diseaseType = remember { diseaseTypeFromName(selectedDisease) }
+    val insightService = remember { AiInsightService() }
+    val coroutineScope = rememberCoroutineScope()
     val recentRecords = recentSevenHealthRecords(LocalDate.now())
-    val sleepValues = recentRecords.map { it.sleepHours }
-    val exerciseValues = recentRecords.map { it.exerciseMinutes.toFloat() }
     val dateLabels = recentRecords.map { it.date.format(ChartDateFormatter) }
+    var sleepValues by remember { mutableStateOf(recentRecords.map { 0f }) }
+    var exerciseValues by remember { mutableStateOf(recentRecords.map { 0f }) }
+    var diseaseScoreValues by remember { mutableStateOf(recentRecords.map { 0f }) }
+    var insightText by remember {
+        mutableStateOf(
+            fallbackInsight(
+                InsightInput(
+                    sleepHours = sleepValues,
+                    exerciseMinutes = exerciseValues,
+                    diseaseScores = diseaseScoreValues,
+                    selectedDisease = selectedDisease
+                )
+            )
+        )
+    }
+    var isInsightLoading by remember { mutableStateOf(false) }
     val averageSleep = sleepValues.average().toFloat()
     val totalExercise = exerciseValues.sum().roundToInt()
+    val currentDiseaseScore = diseaseScoreValues.lastOrNull()?.roundToInt() ?: 0
+
+    LaunchedEffect(Unit) {
+        sleepValues = recentRecords.map { record ->
+            val sleepRecord = sleepDataManager.getSleepData(record.date).first()
+            sleepRecord?.sleepHours() ?: 0f
+        }
+        exerciseValues = recentRecords.map { record ->
+            val exerciseRecord = exerciseDataManager.getExerciseData(record.date).first()
+            (exerciseRecord?.totalExerciseMinutes() ?: 0).toFloat()
+        }
+        diseaseScoreValues = recentRecords.map { record ->
+            val diseaseRecord = diseaseDataManager.getDiseaseData(record.date).first()
+            val medicationItems = medicationListManager.getMedicationList(record.date).first()
+            calculateHealthScore(
+                diseaseType = diseaseType,
+                record = diseaseRecord,
+                medicationStatus = calculateMedicationStatus(medicationItems, record.date)
+            ).toFloat()
+        }
+        insightText = fallbackInsight(
+            InsightInput(
+                sleepHours = sleepValues,
+                exerciseMinutes = exerciseValues,
+                diseaseScores = diseaseScoreValues,
+                selectedDisease = selectedDisease
+            )
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(StatisticsBackground)
             .verticalScroll(scrollState)
-            .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 96.dp)
+            .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 16.dp)
     ) {
         LineChartCard(
             iconResId = R.drawable.ic_moon,
@@ -74,7 +138,6 @@ fun StatisticsLayout() {
             topValue = formatStatValue(averageSleep),
             topUnit = "시간",
             recentLabel = null,
-            axisLabel = "(시간)",
             values = sleepValues,
             xLabels = dateLabels,
             maxValue = 10f,
@@ -91,7 +154,6 @@ fun StatisticsLayout() {
             topLabel = "주간 운동",
             topValue = totalExercise.toString(),
             topUnit = "분",
-            axisLabel = "(분)",
             values = exerciseValues,
             xLabels = dateLabels,
             maxValue = 70f,
@@ -105,11 +167,10 @@ fun StatisticsLayout() {
             iconResId = R.drawable.ic_disease_record,
             title = "상태 점수",
             topLabel = "현재 점수",
-            topValue = "78",
+            topValue = currentDiseaseScore.toString(),
             topUnit = "점",
             recentLabel = null,
-            axisLabel = "(점)",
-            values = listOf(72f, 74f, 70f, 76f, 78f, 80f, 78f),
+            values = diseaseScoreValues,
             xLabels = dateLabels,
             maxValue = 100f,
             yLabels = listOf("100", "75", "50", "25", "0"),
@@ -119,7 +180,23 @@ fun StatisticsLayout() {
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        InsightCard()
+        InsightCard(
+            insightText = if (isInsightLoading) "인사이트를 생성 중입니다..." else insightText,
+            isLoading = isInsightLoading,
+            onGenerateClick = {
+                coroutineScope.launch {
+                    isInsightLoading = true
+                    val input = InsightInput(
+                        sleepHours = sleepValues,
+                        exerciseMinutes = exerciseValues,
+                        diseaseScores = diseaseScoreValues,
+                        selectedDisease = selectedDisease
+                    )
+                    insightText = insightService.createInsight(input)
+                    isInsightLoading = false
+                }
+            }
+        )
     }
 }
 
@@ -222,7 +299,6 @@ private fun LineChartCard(
     topValue: String,
     topUnit: String,
     recentLabel: String?,
-    axisLabel: String,
     values: List<Float>,
     xLabels: List<String>,
     maxValue: Float,
@@ -249,13 +325,6 @@ private fun LineChartCard(
             )
             Spacer(modifier = Modifier.height(2.dp))
         }
-        Text(
-            text = axisLabel,
-            color = MutedText,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
         LineChart(
             values = values,
             xLabels = xLabels,
@@ -277,7 +346,6 @@ private fun BarChartCard(
     topLabel: String,
     topValue: String,
     topUnit: String,
-    axisLabel: String,
     values: List<Float>,
     xLabels: List<String>,
     maxValue: Float,
@@ -292,13 +360,6 @@ private fun BarChartCard(
         topUnit = topUnit,
         topColor = barColor
     ) {
-        Text(
-            text = axisLabel,
-            color = MutedText,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
         BarChart(
             values = values,
             xLabels = xLabels,
@@ -323,7 +384,7 @@ private fun LineChart(
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
-        val left = 34.dp.toPx()
+        val left = 4.dp.toPx()
         val right = 8.dp.toPx()
         val top = 8.dp.toPx()
         val bottom = 24.dp.toPx()
@@ -345,16 +406,16 @@ private fun LineChart(
         }
 
         val gridCount = yLabels.size - 1
-        yLabels.forEachIndexed { index, label ->
+        yLabels.forEachIndexed { index, _ ->
             val y = top + chartHeight * (index.toFloat() / gridCount)
-            drawLine(
-                color = if (index == gridCount) Color(0xFFC7D0D5) else GridLine,
-                start = Offset(left, y),
-                end = Offset(size.width - right, y),
-                strokeWidth = 1.dp.toPx(),
-                pathEffect = if (index == gridCount) null else androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
-            )
-            drawContext.canvas.nativeCanvas.drawText(label, left - 18.dp.toPx(), y + 4.dp.toPx(), textPaint)
+            if (index == gridCount) {
+                drawLine(
+                    color = Color(0xFFC7D0D5),
+                    start = Offset(left, y),
+                    end = Offset(size.width - right, y),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
         }
 
         val points = values.mapIndexed { index, value ->
@@ -400,7 +461,7 @@ private fun BarChart(
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
-        val left = 34.dp.toPx()
+        val left = 4.dp.toPx()
         val right = 8.dp.toPx()
         val top = 8.dp.toPx()
         val bottom = 24.dp.toPx()
@@ -423,16 +484,16 @@ private fun BarChart(
         }
 
         val gridCount = yLabels.size - 1
-        yLabels.forEachIndexed { index, label ->
+        yLabels.forEachIndexed { index, _ ->
             val y = top + chartHeight * (index.toFloat() / gridCount)
-            drawLine(
-                color = if (index == gridCount) Color(0xFFC7D0D5) else GridLine,
-                start = Offset(left, y),
-                end = Offset(size.width - right, y),
-                strokeWidth = 1.dp.toPx(),
-                pathEffect = if (index == gridCount) null else androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
-            )
-            drawContext.canvas.nativeCanvas.drawText(label, left - 18.dp.toPx(), y + 4.dp.toPx(), textPaint)
+            if (index == gridCount) {
+                drawLine(
+                    color = Color(0xFFC7D0D5),
+                    start = Offset(left, y),
+                    end = Offset(size.width - right, y),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
         }
 
         values.forEachIndexed { index, value ->
@@ -454,7 +515,11 @@ private fun BarChart(
 }
 
 @Composable
-private fun InsightCard() {
+private fun InsightCard(
+    insightText: String,
+    isLoading: Boolean,
+    onGenerateClick: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -483,9 +548,27 @@ private fun InsightCard() {
                     fontWeight = FontWeight.ExtraBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                InsightRow(text = "수면 시간이 전반적으로 안정적이에요")
-                Spacer(modifier = Modifier.height(5.dp))
-                InsightRow(text = "주중 운동 시간이 부족한 날이 있었어요")
+                insightText.lines()
+                    .filter { it.isNotBlank() }
+                    .take(3)
+                    .forEachIndexed { index, text ->
+                        if (index > 0) Spacer(modifier = Modifier.height(5.dp))
+                        InsightRow(text = text.removePrefix("-").removePrefix("•").trim())
+                    }
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onGenerateClick,
+                    enabled = !isLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = ExerciseTeal),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(
+                        text = if (isLoading) "생성 중..." else "AI 인사이트 생성",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -516,4 +599,11 @@ private fun formatChartValue(value: Float): String {
 
 private fun formatStatValue(value: Float): String {
     return String.format("%.1f", value)
+}
+
+private fun SleepRecord.sleepHours(): Float {
+    val sleepDuration = Duration.between(bedtime, wakeupTime).let {
+        if (it.isNegative || it.isZero) it.plusDays(1) else it
+    }
+    return sleepDuration.toMinutes() / 60f
 }
